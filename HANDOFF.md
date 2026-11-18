@@ -17,8 +17,9 @@ Phase 3 not started. See `RECOVERY-STATUS.md` for the recovery history and
   on 127.0.0.1:8011 (start/stop/restart/adopt/failure path); blackout Now/Stop with
   `state.json` checks; settings persistence; GPU telemetry cross-checked vs `nvidia-smi`;
   single-instance check; V1 files and production server untouched.
-- QA tooling: `qa-lifecycle.py`, `qa-persistence.py`, `qa-blackout.py`, `qa-events.py`,
-  `qa-shot*.py`, `shot-cdp.js`, `mock-vllm.py`.
+- QA tooling: `tools/qa-lifecycle.py`, `tools/mock-vllm.py`, `tools/cdp.py`,
+  `tools/shots.py`, `tools/make-icon.py`. (Other qa-* scripts from earlier sessions
+  were transient and were not preserved; their evidence lives in TEST-RESULTS.md.)
 - Docs: README (user-facing, verified claims), RECOVERY-STATUS.md, TEST-RESULTS.md,
   screenshots/ (baseline + phase2 sets).
 
