@@ -10,6 +10,23 @@ uploaded anywhere.
 
 ---
 
+## 0. Release summary
+
+**Version 0.1.0 is an early public beta**, built by one developer and tested on
+one machine. If this manifest is used as the release notes, keep the following
+with it — it is the part a downloader needs before running anything.
+
+| Item | Statement |
+| --- | --- |
+| Maturity | **Early public beta.** No stability or support promise: interface, settings schema and behaviour may change without a migration path |
+| Supported platform | **Windows 11 ARM64.** ARM64-only package; it refuses to install on Windows x64. Other ARM64 Windows devices are untested |
+| Tested hardware | **NVIDIA RTX Spark N1X** laptop — the only hardware family this has run on |
+| Native vLLM | **External dependency.** [`devjeonghwan/vllm-for-rtx-spark`](https://github.com/devjeonghwan/vllm-for-rtx-spark) is the engine this application manages; it is not bundled, modified or redistributed here, and the application never installs it |
+| Blackout engine | **External and optional.** No Python runtime or guard script is bundled; Setup completes without them (§5) |
+| Signature | **Unsigned installer and executable.** No code-signing certificate exists, so there is no publisher to verify — use the SHA-256 in §2 |
+| SmartScreen | **Warnings may occur.** Windows may show "Windows protected your PC" or an unknown-publisher prompt on first run |
+| Test coverage | **One host, not multiple independent systems.** Every result in §6 comes from this laptop; nothing was run on a second machine or by an independent tester |
+
 ## 1. Identity
 
 | Field | Value |

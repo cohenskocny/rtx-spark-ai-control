@@ -16,6 +16,32 @@ the machine described in [README §3](README.md#3-requirements), and a Windows
 ARM64 installer has been built and verified locally. Nothing has been published
 or distributed.
 
+### Release notes — what 0.1.0 is, and what it is not
+
+**0.1.0 is an early public beta.** One developer, one machine, one host. Stated
+plainly so no reader has to infer it from the rest of the file:
+
+- **Supported platform: Windows 11 ARM64.** The package is ARM64-only and refuses
+  to install on Windows x64. Other ARM64 Windows devices are untested.
+- **Tested hardware: the NVIDIA RTX Spark N1X laptop.** That is the only
+  hardware family the application has run on. GPU telemetry, battery gating and
+  display control are unverified elsewhere.
+- **Native vLLM is an external dependency.** `devjeonghwan/vllm-for-rtx-spark` is
+  credited as the inference engine this application manages. It is not bundled,
+  modified or redistributed here, and the application never installs it.
+- **The blackout engine is external, and optional.** No Python runtime and no
+  guard script are shipped. Setup completes without them.
+- **The installer is unsigned**, so Windows SmartScreen may warn on first run
+  ("Windows protected your PC" or an unknown-publisher prompt). Verify the
+  SHA-256 in [release/v0.1.0/](release/v0.1.0/SHA256SUMS.txt) instead of trusting
+  a publisher signature, or build from source.
+- **Testing was performed on one host, not several independent systems.** No
+  second-machine install, no independent tester, no compatibility claim.
+
+The same statements, with the evidence behind them, are in the
+[README status table](README.md#status-v010-early-public-beta) and
+[release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md#0-release-summary).
+
 ### Added
 
 - **Control center shell** — Tauri 2 + Rust + React, single window, seven pages
@@ -132,7 +158,9 @@ or distributed.
 
 - A **published** release, a **signed** installer, a migration path for settings
   between published versions, and any installer test on a second machine.
-- GitHub Actions or any continuous integration.
+- A **successful CI run**. `.github/workflows/ci.yml` exists and pins Node.js,
+  Rust and the runner image, but it has never been executed: there is no remote
+  repository yet. Treat every result in this file as a local result.
 - Verification on Windows x64, on other GPU generations, or with other checkpoints.
   None of that has been run.
 - Inference performance measurement while the window is visible: it requires

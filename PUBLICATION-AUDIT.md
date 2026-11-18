@@ -45,7 +45,7 @@ the one recorded in the previous manifest.
 | Update check against a real newly-published upstream release | **NOT TESTED** — mocks only | no such release exists |
 | Battery gate refusing an actual manual start | **NOT TESTED** — needs a live server launch | out of scope by instruction |
 | Automatic blackout from the installed package | **NOT TESTED** — was verified in the dev build previously | session was unlocked only briefly |
-| GitHub Actions / CI | **NOT TESTED — no CI exists.** See §6 | `.github/` does not exist |
+| GitHub Actions / CI | **NOT EXECUTED — the workflow exists, no run has happened.** See §6 | `.github/workflows/ci.yml`, written after this audit |
 
 ---
 
@@ -148,19 +148,29 @@ See §2.
 
 ### Finding 3 — Git author identity is a personal name and a placeholder e-mail
 
-Every commit is authored and committed by `Cohen <cohen@localhost>`. Publishing
-as-is means GitHub shows the commits as **unverified**, because `cohen@localhost`
-is not a routable address. This is a choice, not a defect — but make it
-deliberately:
+Every commit in the history is authored and committed by
+`Cohen <cohen@localhost>`. `cohen@localhost` is not a routable address, so GitHub
+cannot link those commits to an account: they appear under a plain name, with no
+profile link and no "Verified" badge. That is a choice to make deliberately, and
+the cheap moment to make it is before the first push. Three options, in ascending
+order of disruption:
 
-```bash
-git config user.name  "<public name>"
-git config user.email "<you>@users.noreply.github.com"
-```
+| Option | What it means | Effect on history and hashes |
+| --- | --- | --- |
+| **1. Keep it** | Publish as-is | Nothing changes. The name `Cohen` stays on every commit, no commit links to a GitHub account, and `cohen@localhost` is a dead address |
+| **2. Noreply address from now on** | `git config user.name "<public name>"` and `git config user.email "<id>+<login>@users.noreply.github.com"`, both taken from the GitHub account's own e-mail settings | Future commits are attributed to the account (the noreply form counts as a verified address for linking; the "Verified" badge still needs a signature). Existing commits keep `cohen@localhost`, so the log shows two identities and the older ones stay unlinked |
+| **3. Rewrite the history** | Apply the chosen identity to every existing commit — `git filter-repo --commit-callback …`, or `git rebase -i --root` for a short history | One consistent identity from the first commit. Every SHA changes, so every hash quoted in this audit, `HANDOFF.md` and `RELEASE-MANIFEST.md` must be re-recorded, and any clone made before the rewrite breaks |
 
-Setting it now would leave the history mixed; rewriting history to change it
-(`git rebase` / `filter-repo`) before the first push is the cleaner option and is
-harmless while no remote exists.
+**No history was rewritten here, and none should be without the owner's separate
+explicit approval.** The current state is option 1. Option 2 is a two-line
+`git config` change with no permanent consequence. Option 3 is the only route that
+removes the personal name from the published log, and it is the only one that
+invalidates the recorded SHAs.
+
+Retaining the identity is defensible: the work is attributed to one person, the
+LICENSE already names "RTX Spark AI Control contributors", and a placeholder
+address leaks nothing. The cost is cosmetic — unlinked, unverified commits — and
+permanent once pushed.
 
 ### Finding 4 — a 4.8 MB QA capture is 65 % of the repository
 
@@ -245,33 +255,61 @@ the installer did.
 
 ## 6. CI and external validation
 
-### There is no CI
+### A workflow exists now; it has never been executed
 
-`.github/` does not exist. There is no workflow, no pipeline, no scheduled run
-and no signing step. `HANDOFF.md:151` and `CHANGELOG.md:135` already say so, and
-that honesty is correct — but it means §1's results are only reproducible by hand
-on this machine.
+`.github/workflows/ci.yml` was added after this audit, to the plan below. It runs
+on `windows-11-arm` — GitHub's standard GitHub-hosted Windows 11 ARM64 image,
+listed in the hosted-runner reference for both public and private repositories
+with Node.js 26.13.1 and Rust 1.98.0 pinned by version, the same two versions
+`RELEASE-MANIFEST.md` §1 records, plus the `aarch64-pc-windows-msvc` target.
 
-**Untested assumptions that a workflow would otherwise cover:**
+Steps: checkout, `setup-node` (with npm cache), `rustup toolchain install 1.98.0`,
+`npm ci`, `npm run test:web`, `npm run build` (type check, then bundle),
+`cargo test --manifest-path src-tauri/Cargo.toml --locked`, and
+`node tools/check-config-example.mjs`. Deliberately absent: signing, installer
+bundling, artifact upload, tagging and any publish or release step.
 
-1. That the build is reproducible on a *different* machine. Nothing pins a
-   toolchain (`rust-toolchain.toml` is absent), so "rustc 1.98.0" is a recording of
-   this host, not an enforced requirement.
-2. That `npm ci` from `package-lock.json` alone is sufficient (the tree here has a
-   populated `node_modules/`, so a clean install was never exercised).
+**What that does and does not prove.** The file parses as YAML (`yaml valid`,
+exit 0), its five commands were run by hand on this host on 2026-11-18 and passed,
+and the runner label and pinned versions were checked against GitHub's own
+documentation. **No GitHub Actions run has happened** — there is no remote
+repository — so nothing about the hosted environment is verified: not the runner
+image contents, not `setup-node`'s ARM64 download, not a clean `npm ci`, not the
+ARM64 linker. Do not add a CI badge until a run exists.
+
+**Untested assumptions the workflow is written to settle:**
+
+1. That the build is reproducible on a *different* machine. The workflow pins the
+   toolchain, so the version requirement is now enforced rather than recorded
+   (there is still no `rust-toolchain.toml`, which is why the pin lives in CI).
+2. That `npm ci` from `package-lock.json` alone is sufficient — the tree here has
+   a populated `node_modules/`, so a clean install was never exercised. **This is
+   the first step likely to fail.**
 3. That the `--remap-path-prefix` sanitization holds on a host whose
-   `CARGO_HOME` or profile path differs — the logic is path-derived and tested
-   locally, but a second environment would be the real check.
+   `CARGO_HOME` or profile path differs. Not covered: the release build is not
+   run in CI.
 4. That the 50 Rust tests pass on a clean checkout without the existing
    `src-tauri/target/` cache.
 5. Platform-specific test behaviour: `upstream` tests bind loopback ports and set
-   process-wide environment variables under a mutex. That works here; a CI runner
+   process-wide environment variables under a mutex. That works here; a runner
    would confirm it is not host-dependent.
-6. That the ARM64 NSIS bundle succeeds without the cached `nsis` toolchain.
+6. That the ARM64 NSIS bundle succeeds without the cached `nsis` toolchain. **Not
+   covered by design**: the workflow does not bundle.
 
 A minimal honest workflow would run `npm ci`, `npm run test:web`,
 `npm run build`, and `cargo test` on `windows-11-arm`, and nothing else. Do not
 add a release-upload or signing step until §10's ordering is decided.
+
+### Local re-validation, 2026-11-18 (after the workflow was written)
+
+| Check | Result |
+| --- | --- |
+| `yaml valid` on `.github/workflows/ci.yml` | PASS, exit 0; parsed structure: one job, eight steps, `runs-on: windows-11-arm` |
+| `npm run test:web` | PASS, 24 tests, 0 failures |
+| `npm run build` (`tsc --noEmit && vite build`) | PASS, 52 modules, no diagnostics |
+| `cargo test --manifest-path src-tauri/Cargo.toml --locked` | PASS, 50 tests, 0 failures |
+| `node tools/check-config-example.mjs` | PASS — 13 path fields, no host paths |
+| Anything in GitHub Actions | **NOT RUN** — no remote exists |
 
 ### Second-machine installation: NOT PERFORMED
 
@@ -367,8 +405,8 @@ Nothing here is unfixable. Ordered by what actually stops a release.
 | 1 | No remote repository exists, and nothing has ever been pushed. `git remote -v` is empty, `git tag` is empty | Blocking by definition | For the maintainer |
 | 2 | Binaries unsigned; SmartScreen warning not observed on a clean machine | High — user trust | Documented in §8; accepted risk |
 | 3 | Installer never run on a second machine or clean image | High — the only real compatibility evidence | **Open**, cannot be closed here (§6) |
-| 4 | No CI. Every result in §1 is manual and host-specific | Medium | **Open** (§6 lists the six assumptions) |
-| 5 | Git author identity is `Cohen <cohen@localhost>`; commits will show unverified | Medium — cosmetic but permanent once pushed | Decision needed (§3 finding 3) |
+| 4 | No CI run yet. The workflow is written and its steps were re-run by hand, but nothing has executed on GitHub, so every result in §1 is still manual and host-specific | Medium | **Open** (§6) |
+| 5 | Git author identity is `Cohen <cohen@localhost>`: commits will not link to a GitHub account | Medium — cosmetic, permanent once pushed | **Decision needed** — three options in §3 finding 3; **no history was rewritten** |
 | 6 | SmartScreen behaviour on a clean machine for an unsigned low-prevalence installer | Medium | **NOT TESTED** |
 | 7 | Automatic blackout and the battery refusal were not re-run from the installed package | Low — tested in the dev build and at unit level | **Open** |
 | 8 | `qa-screenshots/display-idle-visible-window.png` is 4.8 MB, 65 % of repository size | Low — cosmetic | Accepted, with the JPEG recommendation in §3 |
@@ -482,5 +520,7 @@ to whoever opens it.
 The archive does not contain its own hash, which would be self-referential.
 Record it separately.
 
-**There are no GitHub Actions workflows in the archive because there are none in
-the repository.** §6 is the authoritative statement of what that leaves untested.
+**There are no GitHub Actions workflows in the archive because there were none in
+the repository when it was produced.** `.github/workflows/ci.yml` was written
+afterwards, so the archive is accurate for the tree it snapshots and §6 is the
+authoritative statement of what CI does and does not cover.

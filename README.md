@@ -11,6 +11,25 @@ React frontend; it starts, stops, restarts and supervises vLLM locally, watches 
 telemetry, and arms the blackout engine automatically after 180 seconds of
 inactivity.
 
+## Status: v0.1.0, early public beta
+
+Version 0.1.0 is an **early public beta** from one developer, validated on one
+machine. Read this table before installing anything; every row is a limit, not a
+formality.
+
+| | |
+| --- | --- |
+| Version | 0.1.0 — early public beta. No stability promise: the interface, the settings schema and the behaviour may change between versions, and there is no migration path yet |
+| Supported platform | **Windows 11 ARM64** only. The package is ARM64 and refuses to install on x64. Other ARM64 Windows devices are untested |
+| Tested hardware | **NVIDIA RTX Spark N1X** laptop — the only hardware family this has run on. GPU telemetry, battery gating and display control are unverified on any other device |
+| Native vLLM | An **external dependency**. It is not bundled, not modified and not redistributed here; you install [`devjeonghwan/vllm-for-rtx-spark`](https://github.com/devjeonghwan/vllm-for-rtx-spark) yourself |
+| Blackout engine | **External and optional.** No Python runtime and no guard script ship with this. Setup completes without them and the rest of the application is unaffected |
+| Installer signature | **Unsigned.** There is no code-signing certificate, so there is no publisher identity to verify beyond the published SHA-256 |
+| SmartScreen | **Expect a warning.** On first run of the installer Windows may show "Windows protected your PC" or an unknown-publisher prompt. Choose "More info" → "Run anyway" only if you accept an unsigned binary, or build from source instead |
+| Test coverage | **One host, not several.** Everything here was measured on a single laptop. Nothing has been run on a second machine or by an independent tester, so no compatibility claim is made anywhere in this repository |
+
+The inference engine's own project is credited in [§12](#12-credits-and-licence).
+
 ![Home](screenshots/01-home.jpg)
 
 ---
@@ -88,7 +107,8 @@ nothing on this list is claimed. See [INSTALL.md](INSTALL.md).
   only verified path today.
 - **Per-user installer**: built and verified locally (NSIS, no administrator
   rights, ARM64 only) — [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
-  It is unsigned, and nothing has been published.
+  It is unsigned and nothing has been published, so expect a SmartScreen warning
+  on first run ([status](#status-v010-early-public-beta)).
 - Connecting an existing vLLM installation: [INSTALL.md](INSTALL.md#3-connect-an-existing-native-vllm-installation).
 - Every path, the endpoint and the served model name: [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -253,7 +273,13 @@ npm run build       # typecheck the frontend and bundle it
 npm run test:web    # frontend unit tests (node --test, no extra dependency)
 cargo test --manifest-path src-tauri\Cargo.toml
 npm run tauri build # release binary + per-user NSIS installer (verified, exit 0)
+node tools/check-config-example.mjs   # the example configuration is still a template
 ```
+
+`.github/workflows/ci.yml` runs the same checks on GitHub's `windows-11-arm`
+runner with the pinned versions recorded in the release manifest. **It has never
+been executed**: there is no remote repository yet, so a green badge would be a
+claim nobody has earned. See [HANDOFF.md](HANDOFF.md).
 
 `npm run app:dev` used to die with an `EBUSY` error from the file watcher: Vite walked
 `src-tauri/target` while cargo executed a build script inside it, and the watcher's

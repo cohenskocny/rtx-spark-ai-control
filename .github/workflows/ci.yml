@@ -1,0 +1,82 @@
+# Continuous integration: build and test on Windows 11 ARM64.
+#
+# Runner choice. `windows-11-arm` is GitHub's standard, GitHub-hosted Windows 11
+# ARM64 image (4 vCPU / 16 GB for public repositories, 2 vCPU / 8 GB for private
+# ones). Checked against GitHub's "GitHub-hosted runners reference" on 2026-11-18:
+# the label is listed under both the public and private standard-runner tables, so
+# it is no longer limited to the public preview it started as in 2025. It is the
+# only hosted label that matches this project's supported platform, so the Rust
+# code and the tests run on ARM64 natively instead of being cross-compiled from
+# x64.
+#
+# Versions are pinned deliberately to what the release was built and tested with
+# (see release/v0.1.0/RELEASE-MANIFEST.md §1): Node.js 26.13.1, Rust 1.98.0 with
+# the aarch64-pc-windows-msvc target. The repository has no `rust-toolchain.toml`,
+# so the CI file is where that pin lives; if the pin moves, the manifest moves too.
+#
+# Deliberately absent: code signing, installer bundling, artifact upload, release
+# creation and any publishing step. This workflow only proves that the tree still
+# builds and passes its tests on a machine that is not the maintainer's.
+#
+# Nothing here has been executed on GitHub yet — there is no remote repository.
+
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build and test (Windows 11 ARM64)
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Install Node.js 26.13.1
+        uses: actions/setup-node@v7
+        with:
+          node-version: "26.13.1"
+          cache: npm
+
+      # rustup ships with the runner image; installing the toolchain by name keeps
+      # the Rust version an explicit pin rather than a property of the image.
+      - name: Install Rust 1.98.0 for aarch64-pc-windows-msvc
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --target aarch64-pc-windows-msvc --no-self-update
+          rustup default 1.98.0
+          rustc --version --verbose
+          cargo --version
+
+      # `npm ci` is the real test of package-lock.json: the maintainer's tree has a
+      # populated node_modules/, so a clean install has never been exercised here.
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend unit tests
+        run: npm run test:web
+
+      # `npm run build` is `tsc --noEmit && vite build`: type check first, then the
+      # production bundle. Both are required to pass.
+      - name: Type check and build the frontend
+        run: npm run build
+
+      # `--locked` fails if Cargo.lock would have to change, so the tested
+      # dependency graph is the one that is committed.
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Validate the public configuration example
+        run: node tools/check-config-example.mjs
