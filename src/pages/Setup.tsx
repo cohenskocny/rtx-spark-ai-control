@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Candidate, PathsConfig, Snapshot, Validation } from "../lib/types";
 import { Card, Pill, Row, SectionHead } from "../components/primitives";
 import { config, errorText } from "../lib/api";
+import { blackoutAvailability } from "../lib/optional";
 
 /** Every text field of the configuration. `api_port` is edited as text and
  *  narrowed on save so a half-typed number never reaches the backend. */
@@ -17,8 +18,8 @@ const LABELS: Record<string, { label: string; help: string }> = {
     help: "vllm.exe inside that environment, used to start the server",
   },
   python_exe: {
-    label: "Python executable",
-    help: "the interpreter that owns the environment",
+    label: "Python executable (optional)",
+    help: "the interpreter that owns the environment; also the guard's fallback",
   },
   model_checkpoint: {
     label: "Model checkpoint",
@@ -33,12 +34,12 @@ const LABELS: Record<string, { label: string; help: string }> = {
     help: "optional Jinja template for the served model",
   },
   blackout_engine: {
-    label: "Blackout engine",
-    help: "the sleep / OLED guard script",
+    label: "Blackout engine (optional)",
+    help: "the sleep / OLED guard script — leave empty to use vLLM management only",
   },
   blackout_python: {
-    label: "Blackout interpreter",
-    help: "the interpreter the blackout engine runs on",
+    label: "Blackout interpreter (optional)",
+    help: "the interpreter the guard runs on; empty falls back to the Python above",
   },
   logs_dir: {
     label: "Logs folder",
@@ -149,6 +150,10 @@ export function Setup({ snap }: { snap: Snapshot | null }) {
     }
   }
 
+  const guard = blackoutAvailability(
+    Boolean(snap?.config.blackout_ready),
+    snap?.config.missing_blackout ?? [],
+  );
   const missingLaunch = snap?.config.missing_launch ?? [];
   const missingBlackout = snap?.config.missing_blackout ?? [];
   const ready = snap?.config.launch_ready ?? false;
@@ -165,8 +170,8 @@ export function Setup({ snap }: { snap: Snapshot | null }) {
           <Pill tone={ready ? "live" : "loading"}>
             {ready ? "launch paths complete" : "setup needed"}
           </Pill>
-          <Pill tone={snap?.config.blackout_ready ? "ghost" : "idle"} small>
-            {snap?.config.blackout_ready ? "blackout ready" : "blackout incomplete"}
+          <Pill tone={guard.available ? "ghost" : "idle"} small>
+            {guard.label}
           </Pill>
           {onBattery ? (
             <Pill tone="loading" small>
@@ -178,8 +183,12 @@ export function Setup({ snap }: { snap: Snapshot | null }) {
           <Row k="Endpoint" v={snap?.config.endpoint ?? "—"} mono />
           <Row k="Missing" v={missingLaunch.length ? missingLaunch.join(", ") : "nothing"} />
           <Row
-            k="Blackout missing"
-            v={missingBlackout.length ? missingBlackout.join(", ") : "nothing"}
+            k="Blackout (optional)"
+            v={
+              missingBlackout.length
+                ? `${missingBlackout.join(", ")} not set — needed only for the OLED guard`
+                : "configured"
+            }
           />
         </div>
         <div className="hero-actions" style={{ marginTop: 16 }}>

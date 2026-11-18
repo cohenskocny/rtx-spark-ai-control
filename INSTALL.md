@@ -94,8 +94,8 @@ usable.
 | `model_checkpoint` | The local model checkpoint directory | yes |
 | `launch_config` | The YAML serve configuration passed to `vllm serve --config` | yes |
 | `chat_template` | The chat template `.jinja` passed to `--chat-template` | yes |
-| `blackout_engine` | The `blackout.py` guard script | yes, for the Blackout page |
-| `blackout_python` | The interpreter that runs the guard | yes, for the Blackout page |
+| `blackout_engine` | The `blackout.py` guard script | no — optional feature |
+| `blackout_python` | The interpreter that runs the guard | no — defaults to `python_exe` |
 | `python_exe` | The installation's own interpreter; only a fallback for the guard and the version probe | no |
 | `logs_dir` | Where you want logs to live, if anywhere | no |
 | `legacy_config` | A V1-style `config.json` to read paths from, once | no |

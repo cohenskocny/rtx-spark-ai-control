@@ -1,6 +1,7 @@
 import type { Snapshot } from "../lib/types";
 import { Card, Pill, Row, SectionHead } from "../components/primitives";
 import { num, span } from "../lib/format";
+import { blackoutAvailability, blackoutBlockedReason } from "../lib/optional";
 import { actions } from "../lib/api";
 import type { RunAction } from "../lib/useAction";
 
@@ -19,6 +20,13 @@ export function Blackout({
   const active = Boolean(blackout?.active);
   const running = Boolean(blackout?.running);
   const busy = pending !== null;
+  // The guard is optional: when it is not configured, or the configured paths no
+  // longer validate, every control here explains itself instead of failing.
+  const availability = blackoutAvailability(
+    Boolean(snap?.config.blackout_ready),
+    snap?.config.missing_blackout ?? [],
+  );
+  const blocked = blackoutBlockedReason(availability);
 
   const timeouts = Array.from(
     new Set([30, 60, 180, 300, 900, settings?.idle_seconds ?? 180]),
@@ -33,7 +41,13 @@ export function Blackout({
           <div>
             <span className="eyebrow">OLED blackout · validated V1 engine</span>
             <h1 className="display-sm" style={{ marginTop: 12 }}>
-              {active ? "Panel held awake" : running ? "Armed, waiting for idle" : "Blackout standing by"}
+              {!availability.available
+                ? "Blackout is an optional extra"
+                : active
+                  ? "Panel held awake"
+                  : running
+                    ? "Armed, waiting for idle"
+                    : "Blackout standing by"}
             </h1>
           </div>
           <Pill tone={phaseTone} pulse={active}>
@@ -45,9 +59,9 @@ export function Blackout({
           <button
             type="button"
             className="btn primary"
-            disabled={busy}
+            disabled={busy || !availability.available}
             onClick={() => void run("now", actions.blackoutNow)}
-            title="Cover the panel immediately, in RGB(0,0,0), without waiting for idle"
+            title={blocked ?? "Cover the panel immediately, in RGB(0,0,0), without waiting for idle"}
           >
             {pending === "now" ? "Covering…" : "Blackout now"}
           </button>
@@ -71,6 +85,12 @@ export function Blackout({
                 : "No guard process is running"}
           </span>
         </div>
+
+        {blocked ? (
+          <div className="note" style={{ marginTop: 12 }}>
+            {blocked}
+          </div>
+        ) : null}
 
         <div className="rows">
           <Row
@@ -135,7 +155,8 @@ export function Blackout({
               className="switch"
               data-on={settings?.blackout_enabled ?? false}
               aria-label="Automatic blackout"
-              disabled={busy}
+              disabled={busy || !availability.available}
+              title={blocked ?? "Arm the guard automatically"}
               onClick={() =>
                 void run("auto", () => actions.blackoutAuto(!(settings?.blackout_enabled ?? false)))
               }
@@ -156,7 +177,8 @@ export function Blackout({
               className="switch"
               data-on={automation?.follow_server ?? false}
               aria-label="Follow server"
-              disabled={busy}
+              disabled={busy || !availability.available}
+              title={blocked ?? "Arm the guard only while the server is healthy"}
               onClick={() =>
                 void run("follow", () => actions.followServer(!(automation?.follow_server ?? false)))
               }

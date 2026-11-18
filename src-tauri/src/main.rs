@@ -43,6 +43,28 @@ use crate::power::LaunchIntent;
 use crate::upstream::UpstreamView;
 use crate::vllm::StopPlan;
 
+/// Blackout is an optional feature: the guard script and its interpreter are
+/// configuration, not an install step. When neither is usable, say so once and
+/// plainly, and never attempt to spawn a script that was not named — a machine
+/// that only wants vLLM management must not be nagged or told to install
+/// anything.
+fn blackout_unavailable() -> Option<ActionResult> {
+    let config = crate::paths::current();
+    if config.blackout_ready() {
+        return None;
+    }
+    let missing = config.blackout_missing();
+    let detail = if missing.is_empty() {
+        "the configured script or interpreter does not validate".to_string()
+    } else {
+        format!("not configured: {}", missing.join(", "))
+    };
+    Some(ActionResult::fail(format!(
+        "Blackout is an optional feature and is unavailable here ({detail}). \
+         vLLM management is unaffected; set both guard paths in Setup to enable it."
+    )))
+}
+
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 static STARTED: OnceLock<Instant> = OnceLock::new();
 
@@ -215,6 +237,10 @@ async fn server_adopt() -> Result<ActionResult, String> {
 async fn blackout_now() -> Result<ActionResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let shared = shared()?;
+        if let Some(unavailable) = blackout_unavailable() {
+            lock(&shared).record_action(&unavailable);
+            return Ok::<ActionResult, String>(unavailable);
+        }
         let mut core = lock(&shared);
         let settings = core.settings.clone();
         // While automation is enabled the guard stays in automation's hands, so
@@ -258,6 +284,13 @@ async fn blackout_stop() -> Result<ActionResult, String> {
 async fn blackout_auto(enabled: bool) -> Result<ActionResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let shared = shared()?;
+        // Turning it off is always allowed; turning it on needs a guard to arm.
+        if enabled {
+            if let Some(unavailable) = blackout_unavailable() {
+                lock(&shared).record_action(&unavailable);
+                return Ok::<ActionResult, String>(unavailable);
+            }
+        }
         let mut core = lock(&shared);
         core.settings.blackout_enabled = enabled;
         core.auto.suspended = false;
@@ -294,6 +327,12 @@ async fn blackout_auto(enabled: bool) -> Result<ActionResult, String> {
 async fn follow_server(enabled: bool) -> Result<ActionResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let shared = shared()?;
+        if enabled {
+            if let Some(unavailable) = blackout_unavailable() {
+                lock(&shared).record_action(&unavailable);
+                return Ok::<ActionResult, String>(unavailable);
+            }
+        }
         let mut core = lock(&shared);
         core.settings.follow_server = enabled;
         // A fresh health window, so enabling this cannot arm immediately on the

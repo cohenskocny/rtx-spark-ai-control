@@ -50,8 +50,8 @@ whole configuration is saved.
 | `model_checkpoint` | folder | launch + save | Read only; the checkpoint is never written to |
 | `launch_config` | file | launch + save | YAML passed as `--config` |
 | `chat_template` | file | launch + save | Jinja passed as `--chat-template` |
-| `blackout_engine` | file | save | `blackout.py` |
-| `blackout_python` | executable | save | Interpreter that runs the guard |
+| `blackout_engine` | optional file | no | `blackout.py`. Blank is a valid choice: the guard is an optional feature |
+| `blackout_python` | optional executable | no | Interpreter that runs the guard; blank falls back to `python_exe` |
 | `logs_dir` | optional folder | no | May be empty. Recorded only; the application keeps its event ring in memory |
 | `legacy_config` | optional file | no | May be empty. V1-style `config.json`, read once on import |
 | `api_host` | string | yes (defaulted) | Default `127.0.0.1`. Anything that is not hostname characters is stripped; a scheme or path cannot survive |
@@ -59,18 +59,20 @@ whole configuration is saved.
 | `served_model` | string | no | Display only; the server's own `/v1/models` answer is authoritative |
 
 The four `required to launch` fields are what "launch-ready" means: `vllm_exe`,
-`model_checkpoint`, `launch_config` and `chat_template`. Launch-ready is a weaker
-condition than *savable*, and the difference is worth knowing before you start
-typing.
+`model_checkpoint`, `launch_config` and `chat_template`.
 
-Only four fields may be left empty — `python_exe`, `logs_dir`, `legacy_config`
-and `served_model`. Every other field must be present and valid before **Save
-configuration** accepts the document, and that includes the two guard fields and
-`vllm_root`. A machine with a working native-vLLM but no blackout script
-therefore cannot finish the Setup save: the page names the missing field instead
-of storing a half configuration. That is current, deliberate behaviour; if you
-have no guard script, the rest of the application still works against a
-configuration already on disk, but the save path will not complete.
+Six fields may be left empty: `python_exe`, `logs_dir`, `legacy_config`,
+`served_model`, and both guard fields. Everything else must be present and valid
+before **Save configuration** accepts the document.
+
+**Blackout is optional.** A machine that only wants vLLM management saves with
+`blackout_engine` and `blackout_python` blank; the Blackout page then says the
+feature is not configured, its controls are disabled, and inference, telemetry and
+the Updates page are untouched. Nothing is installed, downloaded or searched for on
+your behalf, and no interpreter is taken from `PATH`.
+
+An optional field means "may be empty", not "anything goes": a value that is
+present must exist, so a typo is reported rather than quietly saved.
 
 **Safety properties, by construction:**
 

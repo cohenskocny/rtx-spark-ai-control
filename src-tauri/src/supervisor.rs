@@ -151,7 +151,12 @@ fn tick(core: &mut Core) {
     let settings = core.settings.clone();
     let present = core.with_blackout(|blackout, _events| blackout.engine_present());
     let owner = core.blackout.mode.clone();
-    let want = settings.blackout_enabled
+    // Blackout is optional. With no usable guard there is nothing to arm, and
+    // retrying every tick would only repeat the same failure into the event
+    // ring, so automation stands down and the reason says so.
+    let can_guard = settings.paths.blackout_ready();
+    let want = can_guard
+        && settings.blackout_enabled
         && !core.auto.suspended
         && (!settings.follow_server || core.auto.server_ok);
 
@@ -176,6 +181,12 @@ fn tick(core: &mut Core) {
     core.auto.armed = want && present;
     let (phase, reason) = if !settings.blackout_enabled {
         ("disabled", "Automatic blackout is off.".to_string())
+    } else if !can_guard {
+        (
+            "unavailable",
+            "Blackout is optional and no guard is configured; vLLM management does not need one."
+                .to_string(),
+        )
     } else if core.auto.suspended {
         (
             "paused",

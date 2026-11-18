@@ -57,6 +57,11 @@ pub enum Kind {
     OptionalFile,
     /// May be empty, otherwise validated like `Exe`.
     OptionalExe,
+    /// An optional feature's file: blank means "not using this feature", but a
+    /// value that is present must exist. Absence is allowed; a typo is not.
+    IfSetFile,
+    /// The executable half of `IfSetFile`.
+    IfSetExe,
 }
 
 impl Kind {
@@ -68,11 +73,28 @@ impl Kind {
             Kind::OptionalDir => "optional folder",
             Kind::OptionalFile => "optional file",
             Kind::OptionalExe => "optional executable",
+            Kind::IfSetFile => "optional file",
+            Kind::IfSetExe => "optional executable",
         }
     }
 
     pub fn optional(self) -> bool {
-        matches!(self, Kind::OptionalDir | Kind::OptionalFile | Kind::OptionalExe)
+        matches!(
+            self,
+            Kind::OptionalDir
+                | Kind::OptionalFile
+                | Kind::OptionalExe
+                | Kind::IfSetFile
+                | Kind::IfSetExe
+        )
+    }
+
+    /// Unlike the lenient optional kinds, a value that is present must resolve.
+    fn lenient_about_absence(self) -> bool {
+        matches!(
+            self,
+            Kind::OptionalDir | Kind::OptionalFile | Kind::OptionalExe
+        )
     }
 
     fn wants_dir(self) -> bool {
@@ -144,8 +166,11 @@ pub const FIELDS: &[(&str, Kind)] = &[
     ("model_checkpoint", Kind::Dir),
     ("launch_config", Kind::File),
     ("chat_template", Kind::File),
-    ("blackout_engine", Kind::File),
-    ("blackout_python", Kind::Exe),
+    // Blackout is an optional feature. A machine that only wants vLLM
+    // management must be able to finish Setup without naming a guard script,
+    // and nothing here may go looking for one: an empty value stays empty.
+    ("blackout_engine", Kind::IfSetFile),
+    ("blackout_python", Kind::IfSetExe),
     ("logs_dir", Kind::OptionalDir),
     ("legacy_config", Kind::OptionalFile),
 ];
@@ -214,15 +239,28 @@ impl Paths {
         missing
     }
 
+    /// What the optional guard still needs, in the order a person would read it.
+    /// The interpreter may come from the installation's own `python_exe`, which
+    /// is the same fallback the controller uses at launch time.
     pub fn blackout_missing(&self) -> Vec<&'static str> {
         let mut missing = Vec::new();
         if self.blackout_engine.trim().is_empty() {
             missing.push("blackout engine");
         }
-        if self.blackout_python.trim().is_empty() {
+        if self.guard_interpreter().is_empty() {
             missing.push("blackout interpreter");
         }
         missing
+    }
+
+    /// The interpreter the guard would run under: its own, else the
+    /// installation's. Empty when neither is configured.
+    pub fn guard_interpreter(&self) -> &str {
+        if self.blackout_python.trim().is_empty() {
+            self.python_exe.trim()
+        } else {
+            self.blackout_python.trim()
+        }
     }
 
     /// True when every launch path exists *right now*. Used for `can_start`, so a
@@ -237,12 +275,15 @@ impl Paths {
             && check(&self.chat_template, Kind::File).is_ok()
     }
 
+    /// True when the optional guard could actually be started. Never required
+    /// for inference: a machine may legitimately have no OLED guard at all, and
+    /// nothing here may go looking for one or offer to install it.
     pub fn blackout_ready(&self) -> bool {
         if !self.blackout_missing().is_empty() {
             return false;
         }
         check(&self.blackout_engine, Kind::File).is_ok()
-            && check(&self.blackout_python, Kind::Exe).is_ok()
+            && check(self.guard_interpreter(), Kind::Exe).is_ok()
     }
 
     pub fn field(&self, name: &str) -> &str {
@@ -324,14 +365,15 @@ pub fn check(raw: &str, kind: Kind) -> Result<PathBuf, String> {
             }
         }
         Err(_) => {
-            if kind.optional() {
+            if kind.lenient_about_absence() {
                 return Err(String::new());
             }
             return Err("does not exist".to_string());
         }
     }
 
-    if matches!(kind, Kind::Exe | Kind::OptionalExe) && !has_exe_extension(&path) {
+    if matches!(kind, Kind::Exe | Kind::OptionalExe | Kind::IfSetExe)
+        && !has_exe_extension(&path) {
         return Err("must point at an .exe".to_string());
     }
     Ok(path)
@@ -679,6 +721,90 @@ mod tests {
         assert!(!paths.launch_ready());
         assert_eq!(paths.launch_missing().len(), 4);
         assert_eq!(paths.blackout_missing().len(), 2);
+    }
+
+    /// Blackout is an optional feature: a vLLM-only machine must be able to
+    /// finish Setup with both guard fields empty. This mirrors the sweep
+    /// `config_set` performs, which is what used to refuse the save.
+    #[test]
+    fn a_vllm_only_configuration_saves_without_a_guard() {
+        let dir = std::env::temp_dir().join("v2-optional-blackout-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("vllm.exe");
+        let checkpoint = dir.join("weights");
+        let config_file = dir.join("serve.yaml");
+        let template = dir.join("chat.jinja");
+        for file in [&exe, &config_file, &template] {
+            std::fs::write(file, b"x").unwrap();
+        }
+        std::fs::create_dir_all(&checkpoint).unwrap();
+
+        let paths = Paths {
+            vllm_root: dir.display().to_string(),
+            vllm_exe: exe.display().to_string(),
+            model_checkpoint: checkpoint.display().to_string(),
+            launch_config: config_file.display().to_string(),
+            chat_template: template.display().to_string(),
+            ..Paths::default()
+        };
+
+        // Exactly the loop in `config_set`: no failure may carry a message.
+        let failures: Vec<String> = FIELDS
+            .iter()
+            .filter_map(|(field, kind)| {
+                let message = check(paths.field(field), *kind).err().unwrap_or_default();
+                (!message.is_empty()).then(|| format!("{field}: {message}"))
+            })
+            .collect();
+        assert!(failures.is_empty(), "save refused: {failures:?}");
+
+        assert!(paths.launch_ready());
+        assert!(!paths.blackout_ready());
+        assert_eq!(paths.blackout_missing(), vec!["blackout engine", "blackout interpreter"]);
+    }
+
+    /// The guard's interpreter may come from the installation's own Python; the
+    /// fallback is the one the controller actually uses at launch time.
+    #[test]
+    fn a_guard_interpreter_falls_back_to_the_installations_python() {
+        let dir = std::env::temp_dir().join("v2-guard-fallback-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("blackout.py");
+        let python = dir.join("python.exe");
+        std::fs::write(&script, b"# guard").unwrap();
+        std::fs::write(&python, b"x").unwrap();
+
+        let mut paths = Paths {
+            blackout_engine: script.display().to_string(),
+            python_exe: python.display().to_string(),
+            ..Paths::default()
+        };
+        assert_eq!(paths.guard_interpreter(), python.display().to_string());
+        assert!(paths.blackout_ready());
+
+        // Its own interpreter wins when set, and a broken value is still caught
+        // even though the field is optional.
+        paths.blackout_python = dir.join("missing.exe").display().to_string();
+        assert!(!paths.blackout_ready());
+        assert!(paths.blackout_missing().is_empty());
+
+        paths.blackout_python = String::new();
+        paths.blackout_engine = dir.join("missing.py").display().to_string();
+        assert!(!paths.blackout_ready());
+    }
+
+    /// Optional means "may be empty", not "anything goes".
+    #[test]
+    fn an_optional_guard_path_is_still_validated_when_present() {
+        for (field, kind, value) in [
+            ("blackout_engine", Kind::IfSetFile, r"relative\blackout.py"),
+            ("blackout_python", Kind::IfSetExe, r"C:\nope\python.exe"),
+        ] {
+            assert_eq!(Paths::kind_of(field), Some(kind));
+            assert!(kind.optional());
+            assert!(check("", kind).err().unwrap().is_empty());
+            assert!(!check(value, kind).err().unwrap().is_empty());
+        }
     }
 
     #[test]

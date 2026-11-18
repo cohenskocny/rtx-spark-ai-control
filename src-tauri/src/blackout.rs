@@ -92,13 +92,10 @@ impl BlackoutManager {
 
     /// The interpreter that runs the engine: the configured blackout interpreter,
     /// or the inference environment's own Python when only that is set.
+    /// The guard's interpreter, resolved in one place so the Setup page and the
+    /// controller cannot disagree about what "configured" means.
     fn python_path() -> String {
-        let config = crate::paths::current();
-        let python = config.blackout_python.trim();
-        if !python.is_empty() {
-            return python.to_string();
-        }
-        config.python_exe.trim().to_string()
+        crate::paths::current().guard_interpreter().to_string()
     }
 
     fn script_path() -> PathBuf {

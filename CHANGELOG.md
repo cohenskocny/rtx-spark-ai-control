@@ -87,6 +87,14 @@ packaged or distributed.
 - **A battery launch pretended to work** — the automatic path now refuses with the
   reason shown, and the manual path asks for confirmation instead of starting and
   hoping. `4aa0d01`
+- **Setup refused a vLLM-only machine** — `blackout_engine` and `blackout_python`
+  were required to save, so a machine without the OLED guard could not finish Setup
+  at all. Blackout is optional now: blank saves, the Blackout page names the feature
+  as unconfigured and disables its controls, and automation reports `unavailable`
+  instead of retrying an absent guard on every tick. An optional field still means
+  "may be empty", not "anything goes": a value that is present must exist, so a typo
+  is reported. No interpreter is taken from `PATH` and nothing is installed on the
+  user's behalf.
 
 ### Security
 

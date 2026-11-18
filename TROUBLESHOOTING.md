@@ -21,13 +21,19 @@ Relative paths are rejected. So are paths containing `..`, paths longer than 512
 characters, paths with characters Windows does not allow, and reserved device
 names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`…).
 
-### The save fails because there is no blackout script
+### The Blackout page is disabled and says "optional"
 
-`blackout_engine` and `blackout_python` are required to **save**, even though they
-are not required to *launch* inference. That is current behaviour, documented in
-[CONFIGURATION.md §2](CONFIGURATION.md#2-paths), not a bug to work around: point
-the fields at any existing `blackout.py` and a Python interpreter, or accept that
-the Blackout page stays unavailable.
+That is correct: you configured no guard. Blackout needs `blackout_engine` and an
+interpreter, and it is the only feature that does. Leave both fields empty and the
+rest of the application — lifecycle, telemetry, Updates, Logs — works unchanged.
+Setting them later enables the page on the next save; nothing needs restarting.
+
+### "Blackout is configured but the guard script or interpreter does not validate"
+
+A path is set but does not resolve: the script was moved or deleted, or the
+interpreter is not an `.exe`. Blank means "not using this feature"; a value that is
+present must exist, so a typo is caught at save time. Fix the field, or clear both
+to leave the feature off.
 
 ### "Find installations" finds nothing
 

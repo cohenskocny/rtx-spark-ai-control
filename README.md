@@ -38,7 +38,7 @@ inactivity.
 | Lifecycle | Start, stop and restart the local vLLM server; adopt a server it did not start; detect an already-running server without touching it |
 | Supervision | Tail of the server's own output, readiness from `/v1/models` rather than a timer, weight-loading percentage only when vLLM prints one |
 | Telemetry | GPU utilisation, VRAM, temperature, power, clocks and throttle reasons from `nvidia-smi`, sampled on a configurable interval |
-| Blackout | "Blackout Now" and "Stop Blackout" start and stop the validated `blackout.py` OLED guard; automatic blackout arms after 180 s idle |
+| Blackout | "Blackout Now" and "Stop Blackout" start and stop the validated `blackout.py` OLED guard; automatic blackout arms after 180 s idle. **Optional**: without a guard script the page says so and the rest of the application is unaffected |
 | Follow Server | Automation only arms while the server is genuinely healthy, with hysteresis and a failure grace period |
 | Updates | Read-only check of the upstream native-vLLM project: installed build, newest release, recent commits, compatibility verdict |
 | Setup | Every installation location is configurable, discoverable and validated; nothing is hard-coded to one machine |
