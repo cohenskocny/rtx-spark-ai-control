@@ -176,14 +176,14 @@ All four need an **unlocked** desktop; none of them needs the production server 
 last one touches it at all.
 
 ```powershell
-cd C:\Users\cohen\AI\RTX-Spark-AI-Control-V2
+cd <repository>
 
 # 7/8/13 — automatic blackout, input restore, standby protection
 # DONE 2026-11-18 — see §3b. Executed headlessly with the window visible:
 #   python tools\qa-input.py idle                 # read GetLastInputInfo
 #   python tools\cdp.py eval "window.__TAURI_INTERNALS__.invoke('blackout_timeout',{seconds:45})"
 #   python tools\cdp.py eval "window.__TAURI_INTERNALS__.invoke('blackout_auto',{enabled:true})"
-#   ... wait past threshold, read C:\Users\cohen\AI\RTX-Spark-AI-Blackout\blackout.log ...
+#   ... wait past threshold, read <blackout engine folder>blackout.log ...
 #   python tools\qa-input.py nudge                # real SendInput; watch INACTIVE in the log
 #   python tools\cdp.py eval "window.__TAURI_INTERNALS__.invoke('blackout_auto',{enabled:false})"
 # (threshold restored to 180 s afterwards). "powercfg /requests" needs admin; the engine's

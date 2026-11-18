@@ -95,7 +95,7 @@ Logs page with Follow Server off (the health state is tracked regardless, for th
 ## 4. How to resume
 
 ```powershell
-cd C:\Users\cohen\AI\RTX-Spark-AI-Control-V2
+cd <repository>
 .\run.ps1              # existing binary; add -Build to rebuild first
 curl.exe http://127.0.0.1:8000/v1/models   # server health
 git log --oneline      # baseline + Phase 2 commits
@@ -136,7 +136,7 @@ black. Diagnosis for a blank window is always "check the CDP target URL first".
 ## 6. Git
 
 Repository was initialised during this work; identity is local only
-(`Cohen <cohen@localhost>`).
+(a local, non-published git identity).
 
 | Commit | Content |
 | --- | --- |
