@@ -138,22 +138,15 @@ own settings apply unchanged.
 ## 9. Reporting a vulnerability
 
 There is no published security contact, and no address is invented here to fill
-the gap. Use the private channel that matches the state of the project:
+the gap. Use GitHub's private vulnerability reporting on the repository:
 
-**Once the repository is public** — use GitHub's private vulnerability reporting
-on it. On the repository page: **Security** → **Advisories** → **Report a
-vulnerability**. That opens a private advisory only the maintainers can read, and
-it is the channel to prefer. Do not open a public issue for a vulnerability, and
-do not put exploit details in a pull request.
+**Security** → **Advisories** → **Report a vulnerability**, or directly at
+<https://github.com/cohenskocny/rtx-spark-ai-control/security/advisories/new>.
 
-For the maintainer, the button only exists once **Settings → Code security →
-Private vulnerability reporting** is enabled on the published repository; enabling
-it is a publication prerequisite, not an afterthought.
-
-**Until then** — there is no public repository, no issue tracker and no advisory
-flow, so hand the report to the person who gave you the build. Nothing in a chat
-message is private by default; say explicitly if you want it treated as
-confidential.
+Private vulnerability reporting is enabled on the repository, so that opens a
+private advisory only the maintainer can read. It is the channel to prefer. Do
+not open a public issue for a vulnerability, and do not put exploit details in a
+pull request.
 
 Please include:
 
@@ -172,13 +165,30 @@ Reports are read, but no response time is promised, and there is no bounty. A
 report that cannot be reproduced on the documented hardware may be recorded
 without a fix — see §10.
 
-## 10. Supported versions
+## 10. Supported versions and release status
 
-Only the current `0.1.0` line is being worked on, and it is not yet published — see
-[HANDOFF.md](HANDOFF.md). There is no long-term support commitment and no backport
-policy, because there has been no release to backport to.
+`0.1.0` is the only supported version — the first release, and the only line
+being worked on. There is no long-term support commitment and no backport policy,
+because there is nothing earlier to backport to.
+
+What that version is, before you install it:
+
+- **Early public beta.** The interface, the settings schema and the behaviour may
+  change, and there is no migration path between versions yet.
+- **Windows 11 ARM64 only.** The package refuses to install on Windows x64, and
+  other ARM64 Windows devices are untested.
+- **NVIDIA RTX Spark N1X** is the only hardware this has run on. GPU telemetry,
+  battery gating and display control are unverified on any other device.
+- **native-vLLM is an external dependency** — never bundled, installed or
+  modified here — and the **blackout engine is external and optional**.
+- **One host, not several.** No second-machine install and no independent tester,
+  so no compatibility claim is made anywhere in this repository.
 
 The v0.1.0 binaries are unsigned. A signature is not a security claim about the
 program, but its absence means there is nothing to verify against a publisher
-identity — read [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md)
-and check the SHA-256 before running anything you did not build yourself.
+identity. Windows may therefore show SmartScreen's "Windows protected your PC"
+prompt or an unknown-publisher warning on first run, and that warning is expected
+rather than evidence of tampering. Read
+[release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md) and check
+the SHA-256 in [release/v0.1.0/SHA256SUMS.txt](release/v0.1.0/SHA256SUMS.txt)
+before running anything you did not build yourself.

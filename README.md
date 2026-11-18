@@ -4,9 +4,10 @@ A native Windows ARM64 control center for a local **native-vLLM** inference serv
 NVIDIA RTX Spark laptop, with an OLED sleep guard that keeps the panel out of a
 powered-on black state when the machine is idle.
 
-Version **0.1.0** — built and tested, **not yet published**: there is no tag and no
-release. A per-user Windows ARM64 installer has been built and verified on this
-machine; see [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md). The window is a Tauri 2 shell around a Rust backend and a
+Version **0.1.0** is an early public beta, and its release candidate is finalized
+and awaiting publication: no tag, GitHub release or installer upload exists until
+the maintainer approves them. A per-user Windows ARM64 installer has been built
+and verified on this machine; see [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md). The window is a Tauri 2 shell around a Rust backend and a
 React frontend; it starts, stops, restarts and supervises vLLM locally, watches GPU
 telemetry, and arms the blackout engine automatically after 180 seconds of
 inactivity.
@@ -135,8 +136,8 @@ nothing on this list is claimed. See [INSTALL.md](INSTALL.md).
   only verified path today.
 - **Per-user installer**: built and verified locally (NSIS, no administrator
   rights, ARM64 only) — [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
-  It is unsigned and nothing has been published, so expect a SmartScreen warning
-  on first run ([status](#status-v010-early-public-beta)).
+  It is unsigned, so expect a SmartScreen warning on first run
+  ([status](#status-v010-early-public-beta)).
 - Connecting an existing vLLM installation: [INSTALL.md](INSTALL.md#3-connect-an-existing-native-vllm-installation).
 - Every path, the endpoint and the served model name: [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -307,9 +308,9 @@ node tools/check-config-example.mjs   # the example configuration is still a tem
 ```
 
 `.github/workflows/ci.yml` runs the same checks on GitHub's `windows-11-arm`
-runner with the pinned versions recorded in the release manifest. **It has never
-been executed**: there is no remote repository yet, so a green badge would be a
-claim nobody has earned. See [HANDOFF.md](HANDOFF.md).
+runner with the pinned versions recorded in the release manifest. It passes on
+this tree: two `master` runs succeeded — `8f78f7c` in 3 m 41 s and `c861aa2` in
+3 m 34 s. See the Actions tab and [HANDOFF.md](HANDOFF.md).
 
 `npm run app:dev` used to die with an `EBUSY` error from the file watcher: Vite walked
 `src-tauri/target` while cargo executed a build script inside it, and the watcher's
@@ -330,7 +331,7 @@ Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Symptoms, causes and fixes, including the Modern Standby trap |
 | [SECURITY.md](SECURITY.md) | Threat model, the unlocked-session trade-off, reporting |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Build, test, style, commit rules |
-| [CHANGELOG.md](CHANGELOG.md) | Release history — 0.1.0 is unreleased |
+| [CHANGELOG.md](CHANGELOG.md) | Release history — 0.1.0 is the first release |
 | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | Dependencies and their licences |
 | [LICENSE](LICENSE) | MIT, for this application's own code |
 | [TEST-RESULTS.md](TEST-RESULTS.md) | Item-by-item evidence for the claims above |

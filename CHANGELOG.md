@@ -1,20 +1,22 @@
 # CHANGELOG — RTX Spark AI Control
 
 Version numbers follow [Semantic Versioning](https://semver.org/). Entries are
-grouped by release; everything below is local history, because **nothing has been
-published yet** — there is no tag, no installer and no GitHub release.
+grouped by release. A section marked **pending publication** has a finalized
+release candidate that is not downloadable yet; every other section has been
+published.
 
 Each item names the commit it came from, so a claim can be checked with
 `git show <hash>`.
 
 ---
 
-## [0.1.0] — Unreleased
+## [0.1.0] — early public beta — pending publication
 
-The first version that is intended to be public. It has been built and tested on
-the machine described in [README §3](README.md#3-requirements), and a Windows
-ARM64 installer has been built and verified locally. Nothing has been published
-or distributed.
+The first release. It has been built and tested on the machine described in
+[README §3](README.md#3-requirements), and a Windows ARM64 installer has been
+built and verified locally. The tag, the GitHub release and the installer upload
+are created only after maintainer approval, so nothing is downloadable from this
+repository yet.
 
 ### Release notes — what 0.1.0 is, and what it is not
 
@@ -137,10 +139,19 @@ The same statements, with the evidence behind them, are in the
 ### Packaging
 
 - **Windows ARM64 NSIS installer** — `RTX Spark AI Control_0.1.0_arm64-setup.exe`,
-  1,543,842 bytes, per-user, no elevation. Chosen over MSI because it was already
-  the configured target and installs without administrator rights. Build,
-  checksums and the full verification matrix:
+  1,543,540 bytes, SHA-256
+  `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6`, per-user, no
+  elevation. Chosen over MSI because it was already the configured target and
+  installs without administrator rights. Build, checksums and the full
+  verification matrix:
   [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
+- **Checksums published with the assets** — `release/v0.1.0/SHA256SUMS.txt` covers
+  the installer and the pre-bundle executable; the manifest records the installed
+  executable's differing hash and why it differs.
+- **CI on Windows 11 ARM64** — `.github/workflows/ci.yml` runs the frontend tests,
+  the type check and build, the Rust tests with `--locked`, and the configuration
+  example check on GitHub's `windows-11-arm` runner. Two `master` runs succeeded:
+  `8f78f7c` (3 m 41 s) and `c861aa2` (3 m 34 s).
 - **Silent install and uninstall** verified twice in a throwaway directory: the
   uninstaller removes the program, the shortcut and the registry entry, and
   leaves the settings directory alone. The installer touches nothing outside its
@@ -156,11 +167,9 @@ The same statements, with the evidence behind them, are in the
 
 ### Not in this version
 
-- A **published** release, a **signed** installer, a migration path for settings
-  between published versions, and any installer test on a second machine.
-- A **successful CI run**. `.github/workflows/ci.yml` exists and pins Node.js,
-  Rust and the runner image, but it has never been executed: there is no remote
-  repository yet. Treat every result in this file as a local result.
+- A **signed** installer, a migration path for settings between published
+  versions, and any installer test on a second machine. Every result in this
+  file comes from one host.
 - Verification on Windows x64, on other GPU generations, or with other checkpoints.
   None of that has been run.
 - Inference performance measurement while the window is visible: it requires
