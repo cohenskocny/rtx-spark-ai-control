@@ -20,7 +20,7 @@ export const DEFAULT_PREFS: Prefs = {
   page: "home",
 };
 
-const PAGES = ["home", "server", "blackout", "settings", "logs"];
+const PAGES = ["home", "server", "blackout", "updates", "setup", "settings", "logs"];
 
 export function loadPrefs(): Prefs {
   try {

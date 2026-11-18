@@ -240,6 +240,19 @@ const glyphs: Record<string, ReactNode> = {
       <path d="M9 12h7M9 15h5" opacity="0.7" />
     </svg>
   ),
+  updates: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M20.4 13.2a8.4 8.4 0 1 1-1.2-7" />
+      <path d="M20.6 3.6v4.6h-4.6" />
+      <circle cx="12" cy="13.2" r="2.2" />
+    </svg>
+  ),
+  setup: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M3.6 7.4a1.6 1.6 0 0 1 1.6-1.6h3.3l1.8 2.1h8.5a1.6 1.6 0 0 1 1.6 1.6v8.1a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6z" />
+      <path d="M8.8 13.5 11 15.7l4.2-4.3" />
+    </svg>
+  ),
 };
 
 export function Glyph({ name }: { name: string }) {

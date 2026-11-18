@@ -107,6 +107,7 @@ export interface SettingsView {
   hysteresis_s: number;
   poll_s: number;
   stop_timeout_s: number;
+  autostart_inference: boolean;
 }
 
 export type EventKind = "info" | "ok" | "warn" | "error" | "blackout" | "log";
@@ -137,6 +138,11 @@ export interface Snapshot {
   blackout: BlackoutView;
   automation: AutomationView;
   settings: SettingsView;
+  config: ConfigView;
+  power: PowerView;
+  installed: InstalledInfo;
+  compat: Compat;
+  upstream: UpstreamView;
   events: LogEvent[];
   notes: string[];
   last_action: ActionEcho | null;
@@ -157,4 +163,139 @@ export interface VisibilityEvent {
   minimized: boolean;
   visible: boolean;
   focused: boolean;
+}
+
+// ---------------------------------------------------------------- power & setup
+
+/** Windows power state, sampled with every snapshot. */
+export interface PowerView {
+  online: boolean | null;
+  /** ac · battery · no-battery · unknown */
+  source: string;
+  percent: number | null;
+  battery_saver: boolean | null;
+  seconds_left: number | null;
+  sampled_ms: number;
+  detail: string;
+}
+
+/** One configured path and the backend's verdict on it. */
+export interface FieldView {
+  field: string;
+  kind: string;
+  value: string;
+  ok: boolean;
+  message: string;
+}
+
+export interface PathsConfig {
+  vllm_root: string;
+  vllm_exe: string;
+  python_exe: string;
+  model_checkpoint: string;
+  launch_config: string;
+  chat_template: string;
+  blackout_engine: string;
+  blackout_python: string;
+  logs_dir: string;
+  api_host: string;
+  api_port: number;
+  served_model: string;
+  legacy_config: string;
+}
+
+export interface ConfigView {
+  paths: PathsConfig;
+  fields: FieldView[];
+  api_host: string;
+  api_port: number;
+  endpoint: string;
+  launch_ready: boolean;
+  blackout_ready: boolean;
+  needs_setup: boolean;
+  missing_launch: string[];
+  missing_blackout: string[];
+}
+
+/** A location discovery found. Offered, never applied. */
+export interface Candidate {
+  field: string;
+  path: string;
+  note: string;
+}
+
+export interface Validation {
+  ok: boolean;
+  message: string;
+}
+
+// ------------------------------------------------------------ installed engine
+
+export interface InstalledInfo {
+  version: string;
+  project_version: string;
+  upstream_vllm: string;
+  upstream_commit: string;
+  revision: string;
+  revision_short: string;
+  /** build-info.json · dist-info · unavailable */
+  version_source: string;
+  wheel_tag: string;
+  python: string;
+  arch: string;
+  read_ms: number;
+  notes: string[];
+}
+
+/** current · update-available · ahead · unknown · unsupported-platform */
+export interface Compat {
+  status: string;
+  verified: boolean;
+  tested_project: string;
+  tested_upstream: string;
+  tested_platform: string;
+  message: string;
+}
+
+export interface ReleaseInfo {
+  tag: string;
+  name: string;
+  published_at: string;
+  html_url: string;
+  notes: string;
+  prerelease: boolean;
+  draft: boolean;
+  assets: number;
+}
+
+export interface CommitInfo {
+  sha: string;
+  short: string;
+  title: string;
+  date: string;
+  url: string;
+}
+
+export interface RateInfo {
+  limit: number | null;
+  remaining: number | null;
+  reset_ms: number | null;
+}
+
+/** never · ok · offline · rate-limited · error */
+export interface UpstreamView {
+  status: string;
+  message: string;
+  checked_ms: number;
+  last_success_ms: number;
+  from_cache: boolean;
+  repo_url: string;
+  releases_url: string;
+  latest: ReleaseInfo | null;
+  releases: ReleaseInfo[];
+  commits: CommitInfo[];
+  rate: RateInfo;
+  commits_ahead: boolean;
+  installed_revision: string;
+  next_auto_ms: number;
 }

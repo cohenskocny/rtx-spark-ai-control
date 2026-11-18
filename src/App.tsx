@@ -6,6 +6,8 @@ import { Server } from "./pages/Server";
 import { Blackout } from "./pages/Blackout";
 import { Settings } from "./pages/Settings";
 import { Logs } from "./pages/Logs";
+import { Updates } from "./pages/Updates";
+import { Setup } from "./pages/Setup";
 import { loadPrefs, savePrefs, type Prefs } from "./lib/prefs";
 import { useTelemetry } from "./lib/useTelemetry";
 import { useAction } from "./lib/useAction";
@@ -77,6 +79,16 @@ export default function App() {
         <span className="dot" />
         {telemetry.error ? "telemetry error" : statusPill.text}
       </span>
+      {snap?.power.online === false ? (
+        <span className="pill loading sm" title={snap.power.detail}>
+          battery {snap.power.percent === null ? "" : `${snap.power.percent}%`}
+        </span>
+      ) : null}
+      {snap?.power.online === true ? (
+        <span className="pill ghost sm" title={snap.power.detail}>
+          on AC
+        </span>
+      ) : null}
       {snap?.automation.enabled ? (
         <span className="pill ghost sm" title={snap.automation.reason}>
           auto blackout · {snap.automation.phase}
@@ -137,6 +149,8 @@ export default function App() {
           <Server snap={snap} lastAt={lastAt} run={run} pending={pending} />
         )}
         {prefs.page === "blackout" && <Blackout snap={snap} run={run} pending={pending} />}
+        {prefs.page === "updates" && <Updates snap={snap} refresh={telemetry.refresh} />}
+        {prefs.page === "setup" && <Setup snap={snap} />}
         {prefs.page === "settings" && (
           <Settings
             snap={snap}

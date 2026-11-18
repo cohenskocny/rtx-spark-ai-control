@@ -11,6 +11,8 @@ export const NAV: NavItem[] = [
   { id: "home", label: "Home", glyph: "home" },
   { id: "server", label: "Server", glyph: "server" },
   { id: "blackout", label: "Blackout", glyph: "blackout" },
+  { id: "updates", label: "Updates", glyph: "updates" },
+  { id: "setup", label: "Setup", glyph: "setup" },
   { id: "settings", label: "Settings", glyph: "settings" },
   { id: "logs", label: "Logs", glyph: "logs" },
 ];
