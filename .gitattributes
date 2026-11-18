@@ -1,0 +1,4 @@
+# Checksum files are verified by command-line tools, not read by Windows apps.
+# `core.autocrlf=true` would otherwise check this out with CRLF and make
+# `sha256sum -c` treat the carriage return as part of the file name.
+release/*/SHA256SUMS.txt text eol=lf
