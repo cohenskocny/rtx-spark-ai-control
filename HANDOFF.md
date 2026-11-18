@@ -15,6 +15,42 @@ released, and there is no GitHub repository yet.
 
 Branch `master`. Baseline for Phase 3 was `ade8ca0`.
 
+## Publication audit (2026-11-18, after `b923b73`)
+
+An independent-style audit was run before publication. Full report:
+[PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md). Four defects were found and fixed,
+so **the v0.1.0 binaries were rebuilt and every hash re-recorded**:
+
+1. **The executable carried the builder's account name.** 277 occurrences of
+   `C:\Users\<builder>\.cargo\registry\...` from rustc panic locations — `strip`
+   does not remove those. `tools/build-release.mjs` / `npm run release:build` now
+   sets `--remap-path-prefix` from `USERPROFILE` and `CARGO_HOME` at build time,
+   so the strings read `cargo\registry\...`. No behaviour change; panics still
+   name crate, file and line.
+2. **A personal path in `tools/contention.py`** named the builder's interpreter.
+   Replaced with a description.
+3. **`SHA256SUMS.txt` was CRLF**, so `sha256sum -c` could not verify it. Now LF;
+   both entries report `OK`.
+4. **No example configuration existed.** `CONFIGURATION.example.json` added, with
+   a test that fails if it drifts from the schema.
+
+Re-verified end to end: 50 Rust tests, 24 frontend tests, ARM64 production build,
+silent install into a throwaway directory, two launches producing one process,
+settings written and surviving uninstall, silent uninstall, and a full host-state
+diff showing no new service, driver, task, run key or shortcut.
+
+**Still not tested, and it matters:** the installer has never run on a second
+machine. Everything here is one host. §6 of the audit lists the exact manual
+validation that is still required.
+
+New artifact hashes (the previous manifest's hashes are superseded):
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `RTX Spark AI Control_0.1.0_arm64-setup.exe` | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| `rtx-spark-ai-control-v2.exe` | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
+
+
 | Commit | What |
 | --- | --- |
 | `d70a37f` | Vite watcher no longer walks `src-tauri/target` |
@@ -152,6 +188,12 @@ address) and §10 (unsigned binaries), `CHANGELOG.md` (Packaging section, correc
 
 ## Next milestone: publication
 
+> **Updated after the publication audit.** Read
+> [PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md) before acting on the list below:
+> it re-ran everything, found four defects, fixed them, and rebuilt the binaries,
+> so the hashes in `release/v0.1.0/` are **new**. The list below is still the
+> right order; §9 of the audit is the authoritative blocker list.
+
 In order, because each step depends on the one above:
 
 1. **Code signing.** An unsigned installer from an unknown publisher is the single
@@ -204,15 +246,20 @@ In order, because each step depends on the one above:
 
 ```powershell
 cd <repository>
-cargo test --manifest-path src-tauri\Cargo.toml   # 49 Rust tests
+cargo test --manifest-path src-tauri\Cargo.toml   # 50 Rust tests
 npm run test:web                                  # 24 frontend tests
 npx tsc --noEmit                                  # typecheck only
 npm run build                                     # frontend bundle
-npm run tauri build                               # release binary + NSIS installer
+npm run release:build                             # release binary + NSIS, paths remapped
 node tools\licence-inventory.mjs                  # regenerate DEPENDENCIES.md
 powershell -File tools\shot.ps1 -Out screenshots\x.png -Page Updates -Scale 0.667
 powershell -File tools\optimize-shots.ps1 -Src <archive> -Out screenshots
 ```
+
+Use `npm run release:build` for anything you intend to publish. Plain
+`tauri build` still works, but it bakes the builder's `C:\Users\...` paths into
+the executable as panic-location strings; `release:build` remaps them. See
+[PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md) §2.
 
 The installed package can be smoke-tested without touching real settings or the
 inference environment by pointing `V2_TEST_DATA_DIR` at a throwaway directory:

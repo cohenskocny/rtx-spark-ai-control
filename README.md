@@ -276,6 +276,7 @@ Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | Dependencies and their licences |
 | [LICENSE](LICENSE) | MIT, for this application's own code |
 | [TEST-RESULTS.md](TEST-RESULTS.md) | Item-by-item evidence for the claims above |
+| [PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md) | Pre-publication audit: what is verified, what is not, and the blockers |
 | [HANDOFF.md](HANDOFF.md) | Current state of the work, for whoever picks it up |
 
 ## 12. Credits and licence

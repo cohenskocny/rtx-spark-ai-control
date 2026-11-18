@@ -18,6 +18,7 @@ uploaded anywhere.
 | Version | 0.1.0 |
 | Source commit | `6b07b84` — the last commit that changes application code. The packaging commits that follow it change documentation, screenshots and build scripts only, so the binary above is reproducible from that tree |
 | Build date | 2026-11-18 |
+| Build command | `npm run release:build` — `tools/build-release.mjs`, which sets `--remap-path-prefix` and then runs `tauri build` with the NSIS bundle. See §2a |
 | Host | Windows 11 ARM64, `aarch64-pc-windows-msvc` |
 | Rust | rustc 1.98.0 (88d9e12ae 2026-08-18), cargo 1.98.0 |
 | Node | v26.13.1 |
@@ -28,22 +29,42 @@ uploaded anywhere.
 
 | Artifact | File name | Bytes | SHA-256 |
 | --- | --- | --- | --- |
-| Installer (distribute this) | `RTX Spark AI Control_0.1.0_arm64-setup.exe` | 1,543,842 | `50c785282a92fed63e7f64d4c76aa3df234a1a0474131f1d424f46f1c50daa3f` |
-| Executable, pre-bundle | `rtx-spark-ai-control-v2.exe` | 5,280,768 | `61ffb34b9fb1f239d7184fc754f379996a159d6ad2d2b8e26208f20624fb517f` |
-| Executable, as installed | `rtx-spark-ai-control-v2.exe` | 5,280,768 | `c69baeb572760444092e58e86ff59a60c631a3d2cdacf87f806755b9b6cd759c` |
+| Installer (distribute this) | `RTX Spark AI Control_0.1.0_arm64-setup.exe` | 1,543,540 | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| Executable, pre-bundle | `rtx-spark-ai-control-v2.exe` | 5,276,160 | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
+| Executable, as installed | `rtx-spark-ai-control-v2.exe` | 5,276,160 | `dcba0ea3804bcb1adf25fc188b564e5b98311dc4a6e21a88dbe56773618d63b0` |
 
 The machine-readable copy of the first two is [SHA256SUMS.txt](SHA256SUMS.txt).
 
 **Why the installed executable has a different hash.** Tauri's bundler rewrites a
 three-byte marker inside the copied executable — `__TAURI_BUNDLE_TYPE_VAR_UNK`
-becomes `__TAURI_BUNDLE_TYPE_VAR_NSS` at byte offset 4,953,567 — so the
+becomes `__TAURI_BUNDLE_TYPE_VAR_NSS` at byte offset 4,950,334 — so the
 application knows it was installed by the NSIS bundle rather than copied by hand.
-Nothing else differs: same size, same code. Hash the *installer* to verify a
+Nothing else differs: same size, same code, three bytes. Verified by installing
+and comparing byte by byte. Hash the *installer* to verify a
 download; hash the *installed* executable only to compare against the third row.
 
 Build origin: `src-tauri/target/release/` in the working tree.
 Copies are kept in an archive directory outside the repository so that no binary
 enters Git history.
+
+### 2a. Build-host paths are remapped out of the binary
+
+`rustc` records the absolute path of every source file it compiles as the
+location of a panic or assertion. `strip = true` removes symbols, not those
+string literals, so a plain `tauri build` on this host baked
+`C:\Users\<builder>\.cargo\registry\src\...` into 277 dependency frames — the
+builder's account name, visible to anyone running `strings` on the download.
+
+`npm run release:build` (`tools/build-release.mjs`) now sets
+`--remap-path-prefix` before invoking `tauri build`, so the same strings read
+`cargo\registry\src\...`. The prefixes are read from `USERPROFILE` and
+`CARGO_HOME` at build time, so no machine-specific path is committed and the
+setting is a no-op on a host whose paths already agree. Panic messages still name
+the crate and file, so the change costs nothing in diagnosis.
+
+Verified after the rebuild: scanning the executable for `C:\Users`, the builder's
+name, absolute drive paths, tokens, private keys, e-mail addresses and hostnames
+returns no matches. Cost: 4,608 bytes of the executable and 302 of the installer.
 
 ## 3. Installer type — NSIS, not MSI
 
@@ -122,7 +143,7 @@ directory outside the repository, deleted afterwards.
 
 | Check | Result |
 | --- | --- |
-| `cargo test` — 49 tests | PASS |
+| `cargo test` — 50 tests | PASS |
 | `npm run test:web` — 24 tests | PASS |
 | `npx tsc --noEmit` | PASS, no diagnostics |
 | `npm run build` (frontend production build) | PASS |
@@ -160,11 +181,13 @@ directory outside the repository, deleted afterwards.
   does not search `PATH`, download executables, or elevate.
 - The binaries are unsigned, so there is no signing identity to verify. A
   publisher signature is a prerequisite for distributing this to anyone else.
-- Rust embeds source paths from the build machine in the executable — the
-  `.cargo\registry\src\...` strings are visible in a strings dump. That is normal
-  for a release build, and it exposes a username and directory layout of the
-  build host, not of the user's machine. Nothing in the *repository* contains a
-  personal path; see [SECURITY.md](../../SECURITY.md) §9.
+- `rustc` normally embeds the build machine's source paths in the executable —
+  the `.cargo\registry\src\...` strings visible in a strings dump. Those are
+  normal for a release build, but they would name the builder's account. The
+  release build remaps them (§2a), so the shipped executable carries
+  `cargo\registry\src\...` and no `C:\Users` path at all. Panic messages still
+  name the crate, file and line. Nothing in the *repository* contains a personal
+  path; see [SECURITY.md](../../SECURITY.md) §9.
 - Vulnerability reporting, before any public repository exists, is described in
   [SECURITY.md](../../SECURITY.md).
 
