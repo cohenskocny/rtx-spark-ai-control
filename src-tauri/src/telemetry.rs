@@ -1,12 +1,14 @@
-//! Telemetry collection: GPU via nvidia-smi, vLLM over loopback HTTP, and the
-//! read-only V1 configuration/blackout state on disk.
+//! System telemetry: GPU via nvidia-smi, plus the read-only V1 configuration.
 //!
-//! Nothing here mutates the environment: no spawn of vLLM, no display power
-//! requests, no writes to V1's directory.
+//! Server liveness lives in `vllm.rs` and the blackout guard in `blackout.rs`;
+//! this module only answers "what is in the machine". Nothing here mutates the
+//! environment: no spawn of vLLM, no display power requests, no writes to V1's
+//! directory.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use serde::Serialize;
 
@@ -17,10 +19,7 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Where V1 keeps its config. Read-only.
-pub const V1_ROOT: &str = r"C:\Users\cohen\AI\RTX-Spark-AI-Control";
 pub const V1_CONFIG: &str = r"C:\Users\cohen\AI\RTX-Spark-AI-Control\config.json";
-pub const DEFAULT_BLACKOUT_STATE: &str =
-    r"C:\Users\cohen\AI\RTX-Spark-AI-Blackout\state.json";
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct GpuInfo {
@@ -54,46 +53,14 @@ pub struct ModelInfo {
     pub prefix_caching: bool,
 }
 
+/// The machine half of a snapshot.
 #[derive(Serialize, Clone, Debug, Default)]
-pub struct ServerInfo {
-    pub state: String,
-    pub listening: bool,
-    pub pid: Option<u32>,
-    pub process_name: Option<String>,
-    pub uptime_s: Option<f64>,
-    pub health_ok: bool,
-    pub latency_ms: Option<f64>,
-    pub models: Vec<String>,
-    pub error: Option<String>,
-    pub endpoint: String,
-}
-
-#[derive(Serialize, Clone, Debug, Default)]
-pub struct BlackoutInfo {
-    pub engine_active: bool,
-    pub display_held: bool,
-    pub stopped: bool,
-    pub reason: String,
-    pub updated_utc: String,
-    pub idle_seconds: u64,
-    pub follow_server: bool,
-    pub cover: String,
-    pub enabled: bool,
-    pub stop_file_present: bool,
-    pub state_path: String,
-    pub phase: String,
-}
-
-#[derive(Serialize, Clone, Debug, Default)]
-pub struct Snapshot {
+pub struct SystemView {
     pub seq: u64,
     pub collected_ms: u128,
-    pub collect_duration_ms: u128,
     pub host: String,
     pub model: ModelInfo,
-    pub server: ServerInfo,
     pub gpu: GpuInfo,
-    pub blackout: BlackoutInfo,
     pub notes: Vec<String>,
 }
 
@@ -101,9 +68,6 @@ fn hidden(command: &mut Command) -> &mut Command {
     #[cfg(windows)]
     {
         command.creation_flags(CREATE_NO_WINDOW);
-    }
-    #[cfg(windows)]
-    {
         command.stdin(Stdio::null());
         command.stdout(Stdio::piped());
         command.stderr(Stdio::null());
@@ -174,49 +138,6 @@ pub fn sample_gpu() -> GpuInfo {
     info
 }
 
-// --------------------------------------------------------------------------- HTTP
-
-fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_millis(1200))
-        .timeout(Duration::from_millis(2500))
-        .build()
-}
-
-pub fn probe_models(endpoint: &str) -> (bool, Option<f64>, Vec<String>, Option<String>) {
-    let url = format!("{endpoint}/models");
-    let began = Instant::now();
-    match agent().get(&url).call() {
-        Ok(resp) => {
-            let latency = began.elapsed().as_secs_f64() * 1000.0;
-            if resp.status() != 200 {
-                return (false, Some(latency), Vec::new(), Some(format!("HTTP {}", resp.status())));
-            }
-            let body = resp.into_string().unwrap_or_default();
-            let models = serde_json::from_str::<serde_json::Value>(&body)
-                .ok()
-                .and_then(|v| {
-                    v.get("data").and_then(|d| d.as_array()).map(|arr| {
-                        arr.iter()
-                            .filter_map(|m| m.get("id").and_then(|i| i.as_str()).map(String::from))
-                            .collect::<Vec<_>>()
-                    })
-                })
-                .unwrap_or_default();
-            (true, Some(latency), models, None)
-        }
-        Err(e) => (
-            false,
-            None,
-            Vec::new(),
-            Some(match e {
-                ureq::Error::Status(code, _) => format!("HTTP {code}"),
-                ureq::Error::Transport(t) => t.to_string(),
-            }),
-        ),
-    }
-}
-
 // ------------------------------------------------------------------------ config
 
 fn read_json(path: &str) -> Option<serde_json::Value> {
@@ -272,11 +193,18 @@ pub fn read_model(cfg: &serde_json::Value) -> ModelInfo {
     let yaml = std::fs::read_to_string(&config_path).unwrap_or_default();
     let num_of = |key: &str| -> Option<f64> { yaml_scalar(&yaml, key)?.parse::<f64>().ok() };
 
+    // The QA port override keeps the displayed endpoint honest when the
+    // lifecycle is exercised against a mock on a spare port.
+    let endpoint = match std::env::var("V2_TEST_PORT").ok().and_then(|p| p.parse::<u16>().ok()) {
+        Some(test_port) => format!("http://127.0.0.1:{test_port}/v1"),
+        None => format!("http://{host}:{port}/v1"),
+    };
+
     ModelInfo {
         served_name: get(&["server", "served_model"]),
         checkpoint_exists: Path::new(&checkpoint).exists(),
         checkpoint,
-        endpoint: format!("http://{host}:{port}/v1"),
+        endpoint,
         config_path,
         chat_template: get(&["server", "chat_template"]),
         dtype: yaml_scalar(&yaml, "dtype").unwrap_or_else(|| "unknown".into()),
@@ -293,125 +221,14 @@ pub fn read_model(cfg: &serde_json::Value) -> ModelInfo {
     }
 }
 
-pub fn read_blackout(cfg: &serde_json::Value) -> BlackoutInfo {
-    let idle_seconds = cfg
-        .get("blackout")
-        .and_then(|b| b.get("idle_seconds"))
-        .and_then(|v| v.as_u64())
-        .unwrap_or(180);
-    let follow_server = cfg
-        .get("automation")
-        .and_then(|a| a.get("follow_server"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let enabled = cfg
-        .get("blackout")
-        .and_then(|b| b.get("enabled"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let cover = cfg
-        .get("blackout")
-        .and_then(|b| b.get("cover"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("internal")
-        .to_string();
+// ---------------------------------------------------------------------- sampling
 
-    let script = cfg
-        .get("blackout")
-        .and_then(|b| b.get("script"))
-        .and_then(|v| v.as_str())
-        .map(PathBuf::from);
-    let state_path = script
-        .as_ref()
-        .and_then(|p| p.parent().map(|d| d.join("state.json")))
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_BLACKOUT_STATE));
-    let stop_present = state_path
-        .parent()
-        .map(|d| d.join("STOP").exists())
-        .unwrap_or(false);
+static SEQ: AtomicU64 = AtomicU64::new(0);
 
-    let state = read_json(&state_path.to_string_lossy()).unwrap_or(serde_json::Value::Null);
-    let active = state.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
-    let display_held = state
-        .get("display_held")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let stopped = state.get("stopped").and_then(|v| v.as_bool()).unwrap_or(true);
-    let reason = state
-        .get("reason")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let updated = state
-        .get("utc")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-
-    let phase = if !enabled && !active {
-        "disabled"
-    } else if active {
-        "active"
-    } else if enabled {
-        "armed"
-    } else {
-        "idle"
-    };
-
-    BlackoutInfo {
-        engine_active: active,
-        display_held,
-        stopped,
-        reason,
-        updated_utc: updated,
-        idle_seconds,
-        follow_server,
-        cover,
-        enabled,
-        stop_file_present: stop_present,
-        state_path: state_path.to_string_lossy().to_string(),
-        phase: phase.to_string(),
-    }
-}
-
-// ---------------------------------------------------------------------- snapshot
-
-pub fn collect(seq: u64) -> Snapshot {
+pub fn collect_system() -> SystemView {
     let began = Instant::now();
     let cfg = read_json(V1_CONFIG).unwrap_or(serde_json::Value::Null);
     let model = read_model(&cfg);
-    let port = cfg
-        .get("server")
-        .and_then(|s| s.get("port"))
-        .and_then(|p| p.as_u64())
-        .unwrap_or(8000) as u16;
-
-    let listeners = crate::winproc::listeners_on(port);
-    let listener = listeners.first();
-    let facts = listener.and_then(|l| crate::winproc::process_facts(l.pid));
-    let uptime = facts
-        .as_ref()
-        .and_then(|f| crate::winproc::process_uptime_s(f.created_ticks));
-
-    let (health_ok, latency, models, http_error) = probe_models(&model.endpoint);
-    let listening = listener.is_some();
-
-    let state = if listening && health_ok && !models.is_empty() {
-        "ready"
-    } else if listening && health_ok {
-        "loading"
-    } else if listening {
-        // Socket bound, API not answering yet: a model is still loading unless it
-        // has been sitting there longer than any cold start takes.
-        match uptime {
-            Some(s) if s > 900.0 => "error",
-            _ => "loading",
-        }
-    } else if health_ok {
-        "ready"
-    } else {
-        "stopped"
-    };
 
     let mut notes = Vec::new();
     if !model.checkpoint_exists {
@@ -421,28 +238,12 @@ pub fn collect(seq: u64) -> Snapshot {
         notes.push(format!("V1 config unreadable at {V1_CONFIG}"));
     }
 
-    let server = ServerInfo {
-        state: state.to_string(),
-        listening,
-        pid: listener.map(|l| l.pid),
-        process_name: facts.as_ref().map(|f| f.name.clone()),
-        uptime_s: uptime,
-        health_ok,
-        latency_ms: latency,
-        models,
-        error: http_error,
-        endpoint: model.endpoint.clone(),
-    };
-
-    Snapshot {
-        seq,
+    SystemView {
+        seq: SEQ.fetch_add(1, Ordering::Relaxed) + 1,
         collected_ms: began.elapsed().as_millis(),
-        collect_duration_ms: 0,
         host: hostname(),
         model,
-        server,
         gpu: sample_gpu(),
-        blackout: read_blackout(&cfg),
         notes,
     }
 }
