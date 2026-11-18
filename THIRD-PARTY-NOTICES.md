@@ -34,11 +34,17 @@ component of the operating system rather than a redistributed library. The
 does not exist for Windows ARM64 without clang.
 
 **Transitive crates.** `Cargo.lock` pins 456 packages in total, including the
-Tauri dependency graph. Each is under its own licence, generally
-`MIT OR Apache-2.0`. This file does not enumerate them because a hand-written
-list drifts; generate one from the lock file with a tool such as `cargo-about` or
-`cargo-deny` when a release ships. **Not yet generated — see the release
-packaging milestone in [HANDOFF.md](HANDOFF.md).**
+Tauri dependency graph. All 456 are enumerated, with the licence each crate
+declares, in the generated [DEPENDENCIES.md](DEPENDENCIES.md). Of those, 300 are
+compiled for Windows ARM64; the remaining 156 are Linux, macOS and Android
+crates that `Cargo.lock` resolves but this target never builds. Regenerate the
+list with `node tools/licence-inventory.mjs`, which reads each crate's own
+manifest rather than a hand-maintained table.
+
+What the generated inventory establishes: every crate compiled for this target
+offers a permissive option, no dependency is GPL- or AGPL-only, and 5 crates
+(`cssparser`, `cssparser-macros`, `dtoa-short`, `option-ext`, `selectors`) are
+MPL-2.0 — file-level copyleft that touches only their own unmodified sources.
 
 ## 2. Build and test dependencies (JavaScript)
 
@@ -55,7 +61,10 @@ each package's own `package.json`.
 | `typescript` | Apache-2.0 | Type checking (build time) |
 | `@types/react`, `@types/react-dom` | DefinitelyTyped (MIT per package manifest) | Type declarations (build time) |
 
-`package-lock.json` covers the transitive set; the same caveat as above applies.
+`package-lock.json` resolves 128 packages in total; all are in the generated
+[DEPENDENCIES.md](DEPENDENCIES.md) with the licence each declares. Every one is
+MIT, Apache-2.0, BSD, ISC or a compatible combination; nothing copyleft-only is
+used.
 
 ## 3. The inference engine — external, not bundled
 
@@ -80,7 +89,7 @@ Consequences worth being explicit about:
 | --- | --- | --- |
 | `src-tauri/icons/*` (application icon and Windows asset set) | Drawn by [`tools/make-icon.py`](tools/make-icon.py) in this repository | MIT, as part of this work |
 | `assets/icon-candidates/*` | Same generator's comparison output | MIT |
-| `screenshots/*` | Captures of this application's own window, produced by [`tools/shot.ps1`](tools/shot.ps1) | MIT, as part of this work |
+| `screenshots/*.jpg` | Captures of this application's own window, produced by [`tools/shot.ps1`](tools/shot.ps1) and downsized by [`tools/optimize-shots.ps1`](tools/optimize-shots.ps1) | MIT, as part of this work |
 | Fonts | None bundled. The interface asks for `Segoe UI Variable`, `Cascadia Mono` and fallbacks already present in Windows | Not redistributed |
 | Visual language | Original: a cobalt/pale-blue surface written for this project. No third-party theme, icon set, illustration or template is included | MIT |
 
@@ -92,6 +101,12 @@ The scripts under `tools/` are part of this repository and are MIT. They are
 development and QA aids, not part of the shipped application. Two of them drive
 Microsoft Windows components at run time (WebView2's loopback CDP endpoint and
 `SendInput`); nothing from Microsoft is redistributed.
+
+Two are packaging helpers worth naming because they produce tracked output:
+[`tools/optimize-shots.ps1`](tools/optimize-shots.ps1) resizes the documentation
+screenshots, and [`tools/licence-inventory.mjs`](tools/licence-inventory.mjs)
+generates [DEPENDENCIES.md](DEPENDENCIES.md) from the two lock files. Neither is
+invoked by the application.
 
 ## 6. If you believe something is missing or wrong
 
