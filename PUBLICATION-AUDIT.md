@@ -448,12 +448,39 @@ and no second-machine test has been performed.
 | `tools/build-release.mjs` | New. Remaps build-host paths out of the binary; `npm run release:build` |
 | `package.json` | Adds the `release:build` script |
 | `tools/contention.py` | Removes the builder's absolute interpreter path from a docstring |
+| `.gitattributes` | New. Pins `eol=lf` for `release/*/SHA256SUMS.txt`, because `core.autocrlf=true` here would otherwise restore the CRLF defect on the next Windows checkout |
 | `CONFIGURATION.example.json` | New. Sanitized, loadable example configuration |
 | `src-tauri/src/settings.rs` | New test: the shipped example parses and matches the schema key for key |
 | `CONFIGURATION.md` | Points at the example and explains the test |
 | `release/v0.1.0/RELEASE-MANIFEST.md` | New artifact sizes and hashes, the build command, §2a on path remapping, corrected bundler byte offset (4,950,334), private-path bullet rewritten, test count 50 |
 | `release/v0.1.0/SHA256SUMS.txt` | LF endings so `sha256sum -c` verifies; hashes regenerated |
-| `SECURITY.md`, `README.md`, other docs | No change required — none of them claimed the binary was path-free |
+| `PUBLICATION-AUDIT.md` | This file. Its own publish sequence originally opened with an absolute path under the builder's profile — the same class of leak the audit exists to remove — now relative |
+| `HANDOFF.md`, `README.md` | Point at this audit and record the new hashes |
+| `SECURITY.md`, `CHANGELOG.md`, other docs | No change required — none of them claimed the binary was path-free or quoted a hash |
 
 Both binaries were rebuilt after the change and re-verified. The installer
 recorded in the previous manifest (`50c7852…`) is superseded by `39ec4b17…`.
+
+---
+
+## 12. Review archive
+
+The review package handed to a second reader is
+`RTX-Spark-AI-Control-v0.1.0-Publication-Review.zip`, built from the commit that
+contains this file. It carries the complete source tree, the documentation set,
+the release manifest and checksums, the sanitized example configuration, the real
+screenshots, the third-party notices, this audit, and `test-results/` — the raw
+evidence behind §1. It does **not** carry a compiled binary, a build cache, a
+dependency directory, model files, the operator's real `settings.json`, or any
+production log.
+
+The installer stays outside the archive by design. Its size and SHA-256 are in
+`artifacts.json` and `release/v0.1.0/SHA256SUMS.txt`, so it can be verified
+without being shipped; `REVIEW-PACKAGE.md` in the archive explains the same thing
+to whoever opens it.
+
+The archive does not contain its own hash, which would be self-referential.
+Record it separately.
+
+**There are no GitHub Actions workflows in the archive because there are none in
+the repository.** §6 is the authoritative statement of what that leaves untested.
