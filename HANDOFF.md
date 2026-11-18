@@ -1,117 +1,139 @@
 # HANDOFF — RTX Spark AI Control V2
 
-Updated: 2026-11-18 (Phase 3 recovery — frontend committed)
+Updated: 2026-11-18 (public documentation milestone complete)
 
 ## Status
-**Phase 3 in progress, committed.** Phase 2 remains complete and operational.
-Branch `master`. Nothing has been pushed and no release has been published.
 
-The previous session hit its session-storage limit while preparing the frontend
-commits. The code it had written was already on disk and is committed here
-unchanged; this session added no features.
+Phase 3 implementation is complete and committed. The public documentation set is
+committed. **The next milestone is release packaging** — installer, generated
+licence inventory, CI, repository audit and publishing. Nothing has been pushed,
+tagged or released, and there is no GitHub repository yet.
 
-Phase 3 commits on top of the Phase 2 baseline `ade8ca0`:
+Branch `master`. Baseline for Phase 3 was `ade8ca0`.
 
 | Commit | What |
 | --- | --- |
 | `d70a37f` | Vite watcher no longer walks `src-tauri/target` |
 | `c60111c` | portable configuration, battery gating, upstream awareness |
-| `6b39e1a` | dev poller / TLS / interpreter fixes |
+| `6b39e1a` | dev poller, TLS connector, optional interpreter |
 | `80e7070` | Updates and Setup pages |
 | `4aa0d01` | battery launch confirmation instead of a false start |
 | `5add06f` | version 0.1.0 |
-| `45c12b1` | presentation helpers moved out of `Updates.tsx` into `lib/present.ts` |
-| `7f8c550` | frontend unit tests (`node --test`), `npm run test:web` |
-| `978c04d` | `tools/shot.ps1`, webview capture over loopback CDP |
-| `929b96a` | refreshed page captures plus the four Phase 3 screenshots |
+| `45c12b1` | presentation helpers moved to `lib/present.ts` |
+| `7f8c550` | frontend unit tests (`npm run test:web`) |
+| `978c04d` | `tools/shot.ps1` webview capture |
+| `929b96a` | refreshed captures plus the four Phase 3 screenshots |
+| `60ba062` | Phase 3 recovery handoff |
+| `b144ce8` | **documentation set for 0.1.0** |
 
-## Done in this phase
-- **Updates page** (`src/pages/Updates.tsx`): installed build, source revision,
-  wheel tag, interpreter, newest upstream release with notes, 12 recent commits,
-  compatibility verdict, and the state of the check (reachable / offline /
-  rate limited / never). Manual "Check for Updates"; daily cadence in the
-  backend. Links go through `open_external`, which only accepts the upstream
-  github.com prefix. The pure helpers behind it live in `src/lib/present.ts` so
-  they can be tested without a renderer.
-- **Setup page** (`src/pages/Setup.tsx`): every location is a validated field,
-  discovery offers candidates without applying them, save is all-or-nothing,
-  V1 `config.json` import is read-only. Paths live in
-  `%APPDATA%\com.rtxspark.aicontrol.v2\settings.json` (schema 2), never in the
-  repository.
-- **Battery gating** visible in the top bar and enforced in `vllm::start`:
-  automatic paths never launch on battery; a manual launch needs the inline
-  confirmation (`confirmBattery`).
-- **Dev workflow fixed**: Vite no longer walks `src-tauri/target`
-  (`d70a37f`), and the StrictMode poller bug that left a dev window empty is
-  fixed (`6b39e1a`). `npm run app:dev` now builds and runs with a live UI.
-- **Upstream check verified live**: `0.32.0+rtx_spark.0.2.0`, revision
-  `e9412963ff`, newest release `v0.2.0`, verdict "compatible", quota reported.
-- **Frontend tests**: 20 assertions over `format`, `prefs` and `present` —
-  formatting units, preference round-trip, a storage that throws and one that
-  is corrupt, and the Updates page's status/timestamp/quota/notes behaviour.
+## Done in the documentation milestone
 
-## Verified in the recovery session (2026-11-18)
-- `cargo test --manifest-path src-tauri\Cargo.toml`: **46 passed, 0 failed**,
-  no warnings (2.7 s).
-- `npm run test:web`: **20 passed, 0 failed** (~220 ms).
-- `npx tsc --noEmit`: clean. `npm run build`: 51 modules, 204.97 kB JS
-  (62.93 kB gzip) / 21.33 kB CSS.
-- Raw output, gitignored: `logs/verify/cargo-test.log`, `web-tests.log`,
-  `tsc.log`, `build.log`.
-- **No inference engine was started, stopped, restarted or loaded.** No CUDA
-  benchmark, no inference request, no power-setting change. The machine stayed
-  on battery throughout.
+- **The eight promised documents exist**: `INSTALL.md`, `CONFIGURATION.md`,
+  `TROUBLESHOOTING.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
+  `THIRD-PARTY-NOTICES.md`, `LICENSE`. Every relative link and anchor across the
+  twelve Markdown files resolves; every referenced repository path exists.
+- **Licence: MIT**, for this application's own code, styles and generated icons.
+  Compatibility was checked rather than assumed: every direct Rust and JavaScript
+  dependency declares MIT or Apache-2.0 (`tauri`, `tauri-build`, `serde`,
+  `serde_json`, `ureq`, `windows-sys`, `@tauri-apps/api`, `@tauri-apps/cli`,
+  `react`, `react-dom`, `vite`, `@vitejs/plugin-react`, `typescript`). Upstream
+  native-vLLM is Apache-2.0 and external — not bundled, not modified, so no NOTICE
+  obligation attaches to this repository. No permission, licence text or notice is
+  invented anywhere; `THIRD-PARTY-NOTICES.md` quotes what each manifest says and
+  marks the transitive inventory as still to be generated.
+- **README corrected against the source.** It had claimed a prebuilt installer that
+  does not exist, called the blackout guard a PowerShell script, claimed the guard
+  **suppresses input** (it does not — its own source says nothing is hooked or
+  blocked, and any input removes the overlay), listed "log files" on the Logs page
+  (it shows the event ring and the server's output tail), and called 0.1.0 a first
+  public release when nothing is published. All five are fixed, and
+  `SECURITY.md` now describes a curtain over an unlocked desktop rather than
+  implying a lock.
+- **Tested and unverified are separated by name** throughout: README §3 lists the
+  untested platform/model combinations, §9 labels every measurement with its
+  condition, `INSTALL.md` marks the NSIS installer path unverified, `CHANGELOG.md`
+  carries a "Not in this version" section.
+- **Private information removed**: the working directory and a local git identity
+  were scrubbed from `HANDOFF.md`, `RECOVERY-STATUS.md` and `TEST-RESULTS.md`. The
+  source tree contained none — no credentials, tokens or personal paths.
+- **Battery, OLED, Modern Standby, the security trade-off and the battery gate**
+  are documented where a reader will look for them: README §6–§8,
+  `SECURITY.md` §3 and §7, `TROUBLESHOOTING.md`.
 
-## React polling fix (reviewed here, unchanged)
-`src/lib/useTelemetry.ts` — the polling effect claims the poller on every mount
-(`stopped.current = false; busy.current = false`) with a comment stating why:
-React 18 StrictMode mounts, unmounts and mounts again in development, and the
-first cleanup would otherwise leave `stopped` set for the real mount, giving a
-window that sits at "connecting" with no error. Cleanup sets `stopped` and
-clears the timer; the request's `finally` reschedules only while `!stopped`.
-Schedule is completion-driven, so a slow poll cannot stack, and the timer is
-cleared before every new one.
+### Found while documenting, documented rather than fixed
 
-One accepted nuance: an in-flight sample from the discarded first mount can
-resolve after the second mount and replace its timer. Polling continues and no
-second loop is created (the old timer is cleared first), so it is left as is
-rather than papered over.
+- The Setup save requires **every** non-optional field, including
+  `blackout_engine` and `blackout_python`. A machine with a working vLLM but no
+  guard script cannot complete that save. Recorded in `CONFIGURATION.md` §2 and
+  `TROUBLESHOOTING.md` as current behaviour. Relaxing it is an application change,
+  so it was not made in a documentation session.
+- `logs_dir` is stored but nothing writes there; the event ring lives in memory.
+  Documented as such in `CONFIGURATION.md` §6.
 
-## Deliberately left uncommitted
-`README.md` is rewritten for a 0.1.0 public release and links to eight documents
-that do not exist yet: `INSTALL.md`, `CONFIGURATION.md`, `TROUBLESHOOTING.md`,
-`SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `THIRD-PARTY-NOTICES.md`,
-`LICENSE`. Public-release documentation was out of scope for this session, so
-the file stays modified and untracked-in-diff. Commit it together with those
-documents, or drop it with `git checkout -- README.md`.
+## Verified in this session
 
-## Still open (Phase 3 remainder)
-1. Release documentation set (the eight files above, plus issue/PR templates),
-   then commit the README rewrite.
-2. Release build + SHA-256, GitHub Actions, NSIS packaging.
-3. Repository audit: credentials, personal paths, weights, logs, licensing.
-4. `screenshots/` is ~65 MB, most of it Phase 2 duplicates; the Phase 3
-   captures add ~8.6 MB. Needs an owner decision before publishing — they are
-   isolated in `929b96a` and can be dropped on their own.
-5. Deferred, needs AC power and approval: anything that loads a model (the
-   three-request inference probe, real-server lifecycle).
-6. Not measured: foreground idle cost for the two new pages. Every Phase 3
-   sample is startup-inclusive or occluded, since the window could not be
-   brought to the foreground from the session's shell.
+- `npm run test:web`: **20 passed, 0 failed**. `npx tsc --noEmit`: clean.
+- Link and anchor validation across all twelve Markdown files: **all resolve**.
+  Referenced repository paths: **all exist**.
+- Rust suite **not re-run**: no Rust code changed in this session; it passed 46/46
+  at `60ba062`.
+- **No inference engine was started, stopped, restarted or loaded.** No CUDA work,
+  no inference request, no power-setting change; the machine stayed on battery.
+
+## Next milestone: release packaging
+
+In order, because each step depends on the one above:
+
+1. **Third-party licence inventory.** Generate the transitive list from
+   `Cargo.lock` (456 packages) and `package-lock.json` with `cargo-about` or
+   `cargo-deny` plus a JS licence checker, and bundle the licence texts a
+   distributable should carry. `THIRD-PARTY-NOTICES.md` currently covers direct
+   dependencies only, and says so.
+2. **Release build and installer.** `npm run tauri build` → per-user NSIS
+   (`installMode: "currentUser"`, already configured). Then record the binary size
+   and SHA-256, and actually install, launch and uninstall it on a clean profile.
+   The installer path is **unverified today**; `INSTALL.md` and `README.md` say so.
+3. **Continuous integration.** A Windows ARM64 workflow that runs `cargo test`,
+   `npm run test:web`, `tsc --noEmit` and the frontend build. Confirm runner
+   availability for `windows-11-arm` before writing the badge.
+4. **Repository audit.** Secrets and personal-path scan, `.gitignore` review
+   (`logs/`, `dist/`, `src-tauri/target/`, `results/`, `qa-screenshots`), and the
+   size decision in §"Open decisions".
+5. **Publish.** Create the repository, tag `v0.1.0`, and use `CHANGELOG.md` as the
+   release notes. Remove the "unreleased" wording from `README.md`, `CHANGELOG.md`
+   and `SECURITY.md` in the same commit that tags.
+6. **Then** the deferred verification: foreground idle cost for the two new pages,
+   the three-request inference probe and real-server lifecycle on AC power, and
+   Windows x64.
+
+## Open decisions for the owner
+
+- **`screenshots/` is ~65 MB**, most of it Phase 2 duplicates at full device scale.
+  The four Phase 3 captures add ~8.6 MB. Publishing that is a choice about
+  repository size; the Phase 3 set is isolated in `929b96a` if you want it out.
+- **The Setup save requiring guard paths** — documented, not changed. Decide
+  whether it should be relaxed before 0.1.0 is published.
+- **Security contact.** `SECURITY.md` §9 deliberately says no address is published
+  yet. Pick a channel (private advisory, or an address you are willing to make
+  public) when the repository goes up.
+- **Supported-versions policy** — currently "the only line is 0.1.0, and it is
+  unpublished".
 
 ## Rules that still hold
-- No vLLM start/stop/restart/load, no CUDA benchmark, no inference request.
-  Use the mock server (`tools/mock-vllm.py`) for anything that needs a server.
-- Never modify the production model, the native-vLLM environment, the
-  checkpoint, the NVIDIA driver, ASUS settings or the OLED power configuration.
+
+- No vLLM start/stop/restart/load, no CUDA benchmark, no inference request. Use
+  `tools/mock-vllm.py` for anything that needs a server.
+- Never modify the production model, the native-vLLM environment, the checkpoint,
+  the NVIDIA driver, ASUS settings or the OLED power configuration.
 - No push, no public repository, no release without explicit approval.
 
 ## Next commands
+
 ```powershell
-cd C:\Users\cohen\AI\RTX-Spark-AI-Control-V2
-npm run test:web                       # frontend unit tests
-npm run build                          # frontend typecheck + bundle
-cargo test --manifest-path src-tauri\Cargo.toml
+cd <repository>
+npm run test:web                       # 20 frontend tests
+npm run build                          # typecheck + bundle
+cargo test --manifest-path src-tauri\Cargo.toml   # 46 Rust tests
 npm run app:dev                        # development window (CDP on 9222 optional)
 powershell -File tools\shot.ps1 -Out screenshots\x.png -Page Updates -Scale 0.667
 ```
