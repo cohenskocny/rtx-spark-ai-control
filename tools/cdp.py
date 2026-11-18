@@ -133,8 +133,21 @@ class CDP:
             raise RuntimeError(res["exceptionDetails"].get("text", "evaluation failed"))
         return res["result"].get("value")
 
-    def shot(self, path: str) -> tuple[int, int]:
-        data = self.call("Page.captureScreenshot", {"format": "png", "captureBeyondViewport": False})
+    def shot(self, path: str, full: bool | None = None) -> tuple[int, int]:
+        if full is None:
+            full = os.environ.get("SHOT_FULL") == "1"
+        params: dict = {"format": "png", "captureBeyondViewport": bool(full)}
+        if full:
+            metrics = self.call("Page.getLayoutMetrics", {})
+            size = metrics.get("cssContentSize") or metrics.get("contentSize") or {}
+            params["clip"] = {
+                "x": 0,
+                "y": 0,
+                "width": float(size.get("width", 0)),
+                "height": float(size.get("height", 0)),
+                "scale": 1,
+            }
+        data = self.call("Page.captureScreenshot", params)
         blob = base64.b64decode(data["data"])
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "wb") as fh:
