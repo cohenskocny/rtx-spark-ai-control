@@ -11,8 +11,9 @@ matmuls, recording the SM clock around every rep. It deliberately reports the
 spread: on this machine the GPU can fall out of its fast state mid-run, so a
 single number without spread would be misleading.
 
-Must run with the existing vLLM environment's interpreter (it has torch):
-    C:\\Users\\cohen\\AI\\native-vLLM\\.venv\\Scripts\\python.exe
+Must run with the existing vLLM environment's interpreter, the one that already
+has torch installed — on a native-vLLM installation that is the environment's own
+`Scripts\python.exe`.
 """
 from __future__ import annotations
 
