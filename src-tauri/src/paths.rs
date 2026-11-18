@@ -55,6 +55,8 @@ pub enum Kind {
     OptionalDir,
     /// May be empty, otherwise validated like `File`.
     OptionalFile,
+    /// May be empty, otherwise validated like `Exe`.
+    OptionalExe,
 }
 
 impl Kind {
@@ -65,11 +67,12 @@ impl Kind {
             Kind::Dir => "folder",
             Kind::OptionalDir => "optional folder",
             Kind::OptionalFile => "optional file",
+            Kind::OptionalExe => "optional executable",
         }
     }
 
     pub fn optional(self) -> bool {
-        matches!(self, Kind::OptionalDir | Kind::OptionalFile)
+        matches!(self, Kind::OptionalDir | Kind::OptionalFile | Kind::OptionalExe)
     }
 
     fn wants_dir(self) -> bool {
@@ -137,7 +140,7 @@ impl Default for Paths {
 pub const FIELDS: &[(&str, Kind)] = &[
     ("vllm_root", Kind::Dir),
     ("vllm_exe", Kind::Exe),
-    ("python_exe", Kind::Exe),
+    ("python_exe", Kind::OptionalExe),
     ("model_checkpoint", Kind::Dir),
     ("launch_config", Kind::File),
     ("chat_template", Kind::File),
@@ -276,7 +279,12 @@ pub fn check(raw: &str, kind: Kind) -> Result<PathBuf, String> {
         if kind.optional() {
             return Err(String::new());
         }
-        return Err(format!("a {} is required", kind.label()));
+        let article = if kind.label().starts_with(|c: char| "aeiou".contains(c)) {
+            "an"
+        } else {
+            "a"
+        };
+        return Err(format!("{article} {} is required", kind.label()));
     }
     if text.chars().any(|c| FORBIDDEN.contains(&c)) {
         return Err("contains characters that are not valid in a path".to_string());
@@ -323,7 +331,7 @@ pub fn check(raw: &str, kind: Kind) -> Result<PathBuf, String> {
         }
     }
 
-    if matches!(kind, Kind::Exe) && !has_exe_extension(&path) {
+    if matches!(kind, Kind::Exe | Kind::OptionalExe) && !has_exe_extension(&path) {
         return Err("must point at an .exe".to_string());
     }
     Ok(path)

@@ -374,7 +374,7 @@ impl From<&Paths> for ConfigView {
                 };
                 FieldView {
                     field: field.to_string(),
-                    kind: format!("{kind:?}").to_lowercase(),
+                    kind: kind.label().to_string(),
                     value,
                     ok,
                     message,

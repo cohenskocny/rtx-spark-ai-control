@@ -187,13 +187,23 @@ enum Outcome {
     },
 }
 
+/// The HTTP agent every request goes through.
+///
+/// `ureq` only installs a TLS engine automatically for the rustls feature, and
+/// that feature builds `ring`, which has no Windows ARM64 support without clang.
+/// With the `native-tls` feature the connector has to be supplied explicitly —
+/// without this the first https request fails at runtime with "no TLS backend is
+/// configured", which is exactly what happened the first time this page ran.
 fn agent() -> ureq::Agent {
     let (connect, read) = timeouts();
-    ureq::AgentBuilder::new()
+    let mut builder = ureq::AgentBuilder::new()
         .timeout_connect(connect)
         .timeout_read(read)
-        .user_agent("RTX-Spark-AI-Control/0.1.0 (+https://github.com/devjeonghwan/vllm-for-rtx-spark)")
-        .build()
+        .user_agent("RTX-Spark-AI-Control/0.1.0 (+https://github.com/devjeonghwan/vllm-for-rtx-spark)");
+    if let Ok(native) = ureq::native_tls::TlsConnector::new() {
+        builder = builder.tls_connector(std::sync::Arc::new(native));
+    }
+    builder.build()
 }
 
 fn rate_from_headers(headers: &[(String, String)]) -> Rate {

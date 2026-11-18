@@ -101,6 +101,12 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
   // Visibility: Tauri reports minimise/restore; the DOM reports occlusion and
   // tab switches.
   useEffect(() => {
+    // The effect owns the poller, so it must claim it on every mount: React 18
+    // StrictMode mounts, unmounts and mounts again in development, and the
+    // first cleanup would otherwise leave `stopped` set for the real mount and
+    // the window would sit at "connecting" forever with no error to show.
+    stopped.current = false;
+    busy.current = false;
     let unlisten: (() => void) | undefined;
     void listen<VisibilityEvent>("v2://visibility", (event) => {
       const payload = event.payload;
