@@ -26,8 +26,8 @@ Two rules come before anything else:
 | Python | Only for the QA scripts and the blackout engine |
 
 ```powershell
-git clone <repository>
-cd <repository>
+git clone https://github.com/cohenskocny/rtx-spark-ai-control.git
+cd rtx-spark-ai-control
 npm install
 npm run app:dev      # Vite on 127.0.0.1:1420 + cargo dev build
 ```

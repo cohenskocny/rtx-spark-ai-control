@@ -18,6 +18,10 @@
 # creation and any publishing step. This workflow only proves that the tree still
 # builds and passes its tests on a machine that is not the maintainer's.
 #
+# The repository this workflow is written for is
+# https://github.com/cohenskocny/rtx-spark-ai-control ; the first run happens once
+# the remote exists.
+#
 # Nothing here has been executed on GitHub yet — there is no remote repository.
 
 name: ci

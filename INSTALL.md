@@ -1,5 +1,11 @@
 # INSTALL — RTX Spark AI Control
 
+> **Prefer an agent?** [AGENT-INSTALL.md](AGENT-INSTALL.md) contains a
+> self-contained prompt for a coding agent that does this work with approval at
+> each step, and the read-only checks it runs are
+> `tools/check-requirements.ps1` and `tools/verify-install.ps1`. Everything below
+> is the manual path, and it stays available.
+
 > **No prebuilt installer is published.** This repository has not produced a
 > release installer yet: packaging is the next milestone (see
 > [HANDOFF.md](HANDOFF.md)). Everything below that is marked **tested** was run

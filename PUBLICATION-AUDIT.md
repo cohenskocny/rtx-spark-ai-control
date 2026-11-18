@@ -450,7 +450,7 @@ sha256sum -c release/v0.1.0/SHA256SUMS.txt
 #    and rescan for build-host strings -- the audit's scan must still report 0.
 
 # 6. Create the empty public repository on GitHub, then:
-git remote add origin https://github.com/<owner>/<repo>.git
+git remote add origin https://github.com/cohenskocny/rtx-spark-ai-control.git
 git push -u origin master
 
 # 7. Enable, in the repository settings:

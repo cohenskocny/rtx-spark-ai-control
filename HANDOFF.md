@@ -1,6 +1,6 @@
 # HANDOFF — RTX Spark AI Control V2
 
-Updated: 2026-11-18 (CI written, publication preparation complete, nothing pushed)
+Updated: 2026-11-18 (AI-assisted installation milestone added; CI still unrun, nothing pushed)
 
 ## Status
 
@@ -20,7 +20,58 @@ as a local result until a GitHub Actions run appears.
 The Git author identity is still `Cohen <cohen@localhost>` on all 33 commits. That
 is a deliberate open decision, not an oversight — three options are compared in
 [PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md) §3 finding 3, and **no history was
-rewritten**.
+rewritten**. As of this session the local `user.name` is `Cohen Skocny` for
+future commits; the e-mail is untouched because the GitHub noreply address has
+not been verified.
+
+## AI-assisted installation milestone (2026-11-18)
+
+Scope was documentation and read-only tooling. **No application code changed**:
+no Rust, no React, no `tauri.conf.json`, no `package.json` dependency, no
+behaviour.
+
+| Added | What it is |
+| --- | --- |
+| [AGENT-INSTALL.md](AGENT-INSTALL.md) | One standalone prompt for Claude Code, Codex, OpenCode, T3 Code or any agent. Two paths: GUI-only, and guided full setup. Approval gates before every change, SHA-256 verification of the installer, native-vLLM discovery and configuration, and explicit instructions not to assume a model, checkpoint or folder layout |
+| [AGENTS.md](AGENTS.md) | Repository guide for agents: architecture, supported environment, build and test commands, external dependency boundaries, configuration paths, safety requirements, contribution rules |
+| [tools/check-requirements.ps1](tools/check-requirements.ps1) | Read-only machine check. Exit 0 all required checks passed, 1 a required check failed, 2 unsupported platform, 3 the checks could not run |
+| [tools/verify-install.ps1](tools/verify-install.ps1) | Read-only install check, including an installer SHA-256 comparison against `release/v0.1.0/SHA256SUMS.txt`. Exit 0 verified, 1 required check failed, 2 unsupported, 3 not installed, 4 could not run |
+| [tools/lib/install-checks.ps1](tools/lib/install-checks.ps1) | The verdict functions and the probes behind both scripts. Judgements are pure functions so scenarios are testable without hardware |
+| [tools/test-install-scripts.ps1](tools/test-install-scripts.ps1) | 30 scenario tests: ARM64 detection, unsupported systems, missing GPU, driver and WebView2, absent native-vLLM, existing native-vLLM, incomplete installation, absent blackout engine, battery power, offline host, checksum mismatch, and a user who declines to install |
+
+Documentation and metadata updates in the same commit: README gained an **Install
+with AI Agent** section near the top, two rows in its documentation table and a
+clone URL in Development; `INSTALL.md` points at the guide; `package.json` carries
+`repository`, `homepage` and `bugs`; `CONTRIBUTING.md`, `RELEASE-MANIFEST.md` §9,
+`PUBLICATION-AUDIT.md` §10 and the CI header now name
+<https://github.com/cohenskocny/rtx-spark-ai-control>.
+
+**Verified in this session**
+
+| Check | Result |
+| --- | --- |
+| `powershell -File tools\test-install-scripts.ps1` | **30 scenarios passed, 0 failed**, including an end-to-end `-Json` run of both scripts |
+| `tools\check-requirements.ps1` on this laptop | exit 0 — Windows 11 build 28000, ARM64 via `Win32_Processor` 12, N1X, driver 621.14, WebView2 157.0.4341.60, native-vLLM `0.32.0+rtx_spark.0.2.0` found at its root, battery warning, network reachable |
+| `tools\verify-install.ps1` on this laptop (nothing installed) | exit 3, one required failure — "no application found" — settings file hash and mtime unchanged, no program directory created |
+| Relative links and anchors | 16 Markdown files scanned, none broken |
+| PowerShell parse of all three scripts and the library | clean |
+| Any inference, CUDA work or model load | **none** — no server was started or stopped |
+
+**Limits of that verification**
+
+- The x64, Windows 10, missing-driver, missing-WebView2, offline and
+  checksum-mismatch scenarios are covered with fabricated fact sets, not with
+  real machines. That is deliberate: the point is that the logic is exercised
+  without a second host.
+- The download path in `AGENT-INSTALL.md` has **not** been exercised end to end,
+  because no release is published. Today the guide's "no release yet" branch is
+  the one that applies; the checksum path was exercised with the recorded v0.1.0
+  values and with deliberate mismatches.
+- No coding agent was driven through the prompt by hand. The wording is asserted
+  by test, not by an agent transcript.
+- `Get-ScheduledTask` matching is deliberately narrow: NVIDIA's own
+  `RTXSparkFirstRunNotification_…` task is reported as an ignored vendor task, not
+  as a footprint finding.
 
 Branch `master`. Baseline for Phase 3 was `ade8ca0`.
 
@@ -318,7 +369,9 @@ In order, because each step depends on the one above:
   ship unsigned with a documented hash-only check.
 - **Git author identity**: keep `Cohen <cohen@localhost>`, switch to a GitHub
   noreply address for future commits, or rewrite the history. The third option
-  invalidates every recorded SHA and needs explicit approval.
+  invalidates every recorded SHA and needs explicit approval. The author **name**
+  is now `Cohen Skocny` (local config, this session); the **e-mail** is unchanged
+  until a GitHub noreply address is verified.
 - **Screenshot size**: resolved for the tracked set (1.2 MB). Full-resolution
   originals stay outside the repository by choice.
 - **Security contact**: `SECURITY.md` §9 now names GitHub private vulnerability

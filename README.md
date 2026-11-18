@@ -30,6 +30,34 @@ formality.
 
 The inference engine's own project is credited in [§12](#12-credits-and-licence).
 
+## Install with AI Agent
+
+Prefer to let a coding agent do the reading? [AGENT-INSTALL.md](AGENT-INSTALL.md)
+holds one self-contained prompt for Claude Code, Codex, OpenCode, T3 Code or any
+other agent that can run read-only commands on your machine. Copy the block
+between `PROMPT START` and `PROMPT END` into the agent and answer its two
+questions.
+
+| Path | What the agent does |
+| --- | --- |
+| **GUI only** | Detects Windows 11 ARM64, finds the official release at <https://github.com/cohenskocny/rtx-spark-ai-control/releases>, verifies the installer's SHA-256, asks for approval, installs the GUI, connects the native-vLLM installation you already have, and verifies the result **without loading a model** |
+| **Guided full setup** | Adds hardware, driver and storage checks and walks through installing native vLLM from [`devjeonghwan/vllm-for-rtx-spark`](https://github.com/devjeonghwan/vllm-for-rtx-spark) — with a separate approval before any dependency install, model download or CUDA-related change |
+
+The prompt requires approval before every action that changes the machine, and it
+may not assume your model, checkpoint, launch configuration or folder layout: it
+asks. If you decline a step, it stops and reports instead of re-asking.
+
+None of it is privileged or hidden. The same ground is covered by two read-only
+scripts that install, download and start nothing:
+
+```powershell
+powershell -File tools\check-requirements.ps1    # can this machine run it?
+powershell -File tools\verify-install.ps1        # is what is installed correct?
+```
+
+Manual installation stays available: see [§4](#4-install-and-configure) below and
+[INSTALL.md](INSTALL.md).
+
 ![Home](screenshots/01-home.jpg)
 
 ---
@@ -267,6 +295,8 @@ conditions.
 ## 10. Development
 
 ```powershell
+git clone https://github.com/cohenskocny/rtx-spark-ai-control.git
+cd rtx-spark-ai-control
 npm install
 npm run app:dev     # development window: Vite + cargo, hot reload
 npm run build       # typecheck the frontend and bundle it
@@ -293,6 +323,8 @@ Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | File | Contents |
 | --- | --- |
+| [AGENT-INSTALL.md](AGENT-INSTALL.md) | A paste-in prompt for a coding agent: GUI-only and guided full setup |
+| [AGENTS.md](AGENTS.md) | Repository guide for coding agents: architecture, commands, boundaries, safety |
 | [INSTALL.md](INSTALL.md) | Source build, connecting an existing installation, first run, uninstall |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every setting, every path, discovery rules |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Symptoms, causes and fixes, including the Modern Standby trap |

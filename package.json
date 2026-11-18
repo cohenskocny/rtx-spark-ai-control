@@ -2,6 +2,14 @@
   "name": "rtx-spark-ai-control-v2",
   "private": true,
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cohenskocny/rtx-spark-ai-control.git"
+  },
+  "homepage": "https://github.com/cohenskocny/rtx-spark-ai-control",
+  "bugs": {
+    "url": "https://github.com/cohenskocny/rtx-spark-ai-control/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

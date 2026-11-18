@@ -226,7 +226,8 @@ this:
 1. **Code signing.** An unsigned installer from an unknown publisher is a real
    obstacle, not a formality.
 2. **A public repository** with this history, so the source commit in §1 can be
-   checked against the binary.
+   checked against the binary — intended location:
+   <https://github.com/cohenskocny/rtx-spark-ai-control>.
 3. **A second-machine install test**, ideally on hardware other than the N1X and
    on a fresh Windows ARM64 image.
 4. **The unverified rows in §6** — in particular automatic blackout with a real
