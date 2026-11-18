@@ -6,3 +6,9 @@ results/
 shots/*.png
 __pycache__/
 tools/ps/
+
+# Local working output: build logs, QA captures and machine-specific state stay
+# out of the repository so a public clone carries no session history.
+logs/
+*.log
+.vite/
