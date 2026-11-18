@@ -1,0 +1,217 @@
+/* ==========================================================================
+   RTX Spark AI Control V2 — foundation
+   Cobalt field, grain, halftone, editorial type. All static paint: no ambient
+   animation loop, so an idle window costs nothing to show.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  --ink: #f4f7ff;
+  --ink-soft: rgba(232, 240, 255, 0.72);
+  --ink-dim: rgba(206, 220, 255, 0.48);
+  --ink-faint: rgba(196, 212, 255, 0.3);
+
+  --cobalt-050: #eaf1ff;
+  --cobalt-200: #9dbdff;
+  --cobalt-300: #7aa7ff;
+  --cobalt-400: #4c8dff;
+  --cobalt-500: #2f6bff;
+  --cobalt-600: #1f47c8;
+  --cobalt-900: #0a1440;
+
+  --live: #6ce7c0;
+  --warm: #ffd479;
+  --alert: #ff8f8f;
+
+  --glass: rgba(255, 255, 255, 0.055);
+  --glass-strong: rgba(255, 255, 255, 0.085);
+  --glass-line: rgba(255, 255, 255, 0.1);
+  --glass-line-bright: rgba(255, 255, 255, 0.18);
+
+  --radius-xl: 30px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 11px;
+
+  --rail-w: 264px;
+  --gap: 20px;
+
+  --font-display: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui,
+    -apple-system, sans-serif;
+  --font-text: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", ui-monospace, "SFMono-Regular",
+    Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-text);
+  color: var(--ink);
+  background: #04060d;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+}
+
+/* --------------------------------------------------------------- the field */
+
+.field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 8% -10%, #1b3fb0 0%, rgba(14, 32, 92, 0.55) 34%, transparent 66%),
+    radial-gradient(90% 80% at 96% 4%, #1550d8 0%, rgba(10, 26, 78, 0.5) 42%, transparent 72%),
+    radial-gradient(80% 70% at 62% 118%, #0b2a86 0%, rgba(6, 14, 44, 0.6) 55%, transparent 78%),
+    linear-gradient(168deg, #050916 0%, #04060e 46%, #050a1a 100%);
+}
+
+.field::before {
+  /* halftone */
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background-image: radial-gradient(rgba(180, 210, 255, 0.16) 1px, transparent 1.2px);
+  background-size: 4px 4px;
+  opacity: 0.5;
+  mask-image: radial-gradient(78% 62% at 26% 12%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(78% 62% at 26% 12%, #000 0%, transparent 72%);
+}
+
+.field::after {
+  /* aurora sheet + film grain, both static */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+.aurora {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  width: 78vw;
+  height: 58vh;
+  left: 22vw;
+  top: -18vh;
+  transform: rotate(-9deg);
+  filter: blur(70px);
+  opacity: 0.55;
+  background: conic-gradient(
+    from 210deg at 50% 50%,
+    rgba(64, 120, 255, 0.42),
+    rgba(120, 180, 255, 0.12),
+    rgba(28, 60, 200, 0.4),
+    rgba(90, 150, 255, 0.15),
+    rgba(64, 120, 255, 0.42)
+  );
+  border-radius: 50%;
+}
+
+/* ------------------------------------------------------------------- type */
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: -0.028em;
+  line-height: 0.98;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+
+.display {
+  font-size: clamp(38px, 4.1vw, 66px);
+}
+
+.display-sm {
+  font-size: clamp(26px, 2.2vw, 36px);
+}
+
+.section-title {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  font-weight: 400;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+.dim {
+  color: var(--ink-dim);
+}
+
+.faint {
+  color: var(--ink-faint);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* --------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 180, 255, 0.18);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 180, 255, 0.3);
+  background-clip: content-box;
+}
