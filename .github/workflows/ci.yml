@@ -18,11 +18,14 @@
 # creation and any publishing step. This workflow only proves that the tree still
 # builds and passes its tests on a machine that is not the maintainer's.
 #
-# The repository this workflow is written for is
-# https://github.com/cohenskocny/rtx-spark-ai-control ; the first run happens once
-# the remote exists.
+# The repository this workflow runs in is
+# https://github.com/cohenskocny/rtx-spark-ai-control .
 #
-# Nothing here has been executed on GitHub yet — there is no remote repository.
+# First executed on GitHub on 2026-11-18, once the remote existed: run 44398122737
+# passed on `c861aa2`, 44399554463 on `8f78f7c`, and 44401917640 on `f66ad4a`. The
+# clean `npm ci` — the step expected to break first, because the maintainer's tree
+# has a populated node_modules/ — held on the first run. No configuration change
+# was needed to make this file work on the hosted runner.
 
 name: ci
 

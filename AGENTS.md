@@ -56,8 +56,8 @@ powershell -File tools\test-install-scripts.ps1   # installer scenario tests
 
 `npm run build` runs the type check itself. Both test commands plus the build are
 the minimum before committing. CI (`.github/workflows/ci.yml`, `windows-11-arm`)
-runs the same set; it has not been executed on GitHub yet because there is no
-remote repository.
+runs the same set, and has passed on every `master` push since the repository was
+published on 2026-11-18.
 
 Use `npm run release:build` for anything intended to leave this machine: plain
 `tauri build` bakes the builder's `C:\Users\...` paths into the executable as

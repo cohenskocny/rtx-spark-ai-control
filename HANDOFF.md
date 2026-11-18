@@ -260,9 +260,10 @@ address) and §10 (unsigned binaries), `CHANGELOG.md` (Packaging section, correc
 - **Signature and SmartScreen reputation** — the binaries are unsigned.
 - **Update check against a real new upstream release** — only cached and
   absent-cache behaviour was exercised.
-- **CI** — `.github/workflows/ci.yml` exists, but no GitHub Actions run has ever
-  happened: there is no remote repository. The commands it runs were executed by
-  hand on this host instead.
+- **CI** — at the time of that session `.github/workflows/ci.yml` existed but no
+  GitHub Actions run had happened, because there was no remote repository; the
+  commands it runs were executed by hand on this host instead. Superseded on
+  2026-11-18 — see the CI session below.
 
 ## Session: CI and publication preparation (2026-11-18)
 
@@ -330,7 +331,7 @@ performed on one host, not several independent systems. Attribution to
 | `npm run build` | PASS, 52 modules, no diagnostics |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked` | PASS, 50 tests, 0 failures |
 | `node tools/check-config-example.mjs` | PASS — 13 path fields, no host paths |
-| Any GitHub Actions run | **NOT RUN — no remote repository exists** |
+| Any GitHub Actions run | **NOT RUN at the time of this table** — no remote existed. Green on `master` since 2026-11-18, above |
 
 No vLLM start or stop, no model load, no CUDA work, no power-setting change.
 
@@ -365,10 +366,12 @@ In order, because each step depends on the one above:
    full history, `.gitignore` review, public repository created, `master` pushed,
    **Settings → Code security → Private vulnerability reporting** enabled, and
    workflow token permissions reduced to read-only.
-6. **Publish — NOT STARTED, needs the owner.** Tag `v0.1.0`, attach the installer
-   and `SHA256SUMS.txt`, use `CHANGELOG.md` as release notes, and remove the
-   "unreleased" wording from `README.md`, `CHANGELOG.md` and `SECURITY.md` in the
-   same commit that tags. Nothing has been tagged, drafted or uploaded.
+6. **Publish — NOT STARTED, needs the owner.** The "unreleased" wording is
+   already gone from `README.md`, `CHANGELOG.md` and `SECURITY.md` (`f66ad4a`),
+   and the stale repository and CI claims were corrected in the documentation
+   commit after it. What is left is the owner's decision: tag `v0.1.0`, attach
+   the installer, the executable and `SHA256SUMS.txt`, and use `CHANGELOG.md` as
+   the release notes. Nothing has been tagged, drafted or uploaded.
 7. **Then** the deferred verification: foreground idle cost for the new pages, the
    three-request inference probe and a real-server lifecycle on AC power, and
    Windows x64 behaviour.
@@ -387,8 +390,8 @@ In order, because each step depends on the one above:
 - **Security contact**: `SECURITY.md` §9 now names GitHub private vulnerability
   reporting as the channel and deliberately publishes no address. Private
   vulnerability reporting is enabled on the published repository.
-- **Supported-versions policy**: currently "the only line is 0.1.0, and it is
-  unreleased".
+- **Supported-versions policy**: resolved — the only supported line is 0.1.0, an
+  early public beta, as `SECURITY.md` §10 states.
 
 ## Rules that still hold
 

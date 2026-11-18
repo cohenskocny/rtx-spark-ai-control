@@ -4,9 +4,11 @@ Everything in this file describes the artifacts that were actually built and
 tested on 2026-11-18. Where a check could not be run on this hardware, it says
 **NOT TESTED** instead of implying otherwise.
 
-**Status: unreleased.** This is a locally validated build. Nothing has been
-published, no GitHub repository exists for this project, and no release has been
-uploaded anywhere.
+**Status: release candidate, pending publication.** This is a locally validated
+build of the artifacts described below. The source is published on `master` at
+<https://github.com/cohenskocny/rtx-spark-ai-control>, and the Windows 11 ARM64 CI
+workflow passes there. The `v0.1.0` tag, the GitHub release and the asset upload
+have **not** happened: they are created only after maintainer approval.
 
 ---
 
@@ -205,8 +207,8 @@ directory outside the repository, deleted afterwards.
   `cargo\registry\src\...` and no `C:\Users` path at all. Panic messages still
   name the crate, file and line. Nothing in the *repository* contains a personal
   path; see [SECURITY.md](../../SECURITY.md) §9.
-- Vulnerability reporting, before any public repository exists, is described in
-  [SECURITY.md](../../SECURITY.md).
+- Vulnerability reporting is described in [SECURITY.md](../../SECURITY.md) §9.
+  GitHub private vulnerability reporting is enabled on the published repository.
 
 ## 8. Licence position
 

@@ -255,7 +255,22 @@ the installer did.
 
 ## 6. CI and external validation
 
-### A workflow exists now; it has never been executed
+### A workflow exists now; it had never been executed when this audit was written
+
+> **Status note, added 2026-11-18 after this section was written.** The paragraphs
+> below are preserved as the audit recorded them, because they are the evidence
+> for the date they were written. Since then the repository was created at
+> <https://github.com/cohenskocny/rtx-spark-ai-control>, `master` was pushed, and
+> the workflow has run there green: 44398122737 on `c861aa2`, 44399554463 on
+> `8f78f7c` and 44401917640 on `f66ad4a`. Read "no remote repository" and "no
+> GitHub Actions run has happened" as statements about the audit's own date.
+>
+> Two of the untested assumptions below are now settled, and the outcome was the
+> opposite of the prediction: item 2's clean `npm ci` passed on the first run, and
+> items 1, 4 and 5 (reproducible build, 50 Rust tests on a clean checkout,
+> loopback-binding tests on a hosted runner) now have a hosted run behind them.
+> Items 3 and 6 remain untested by design, because CI does not run the release
+> build or the NSIS bundle. A CI badge is now defensible.
 
 `.github/workflows/ci.yml` was added after this audit, to the plan below. It runs
 on `windows-11-arm` — GitHub's standard GitHub-hosted Windows 11 ARM64 image,
@@ -309,7 +324,7 @@ add a release-upload or signing step until §10's ordering is decided.
 | `npm run build` (`tsc --noEmit && vite build`) | PASS, 52 modules, no diagnostics |
 | `cargo test --manifest-path src-tauri/Cargo.toml --locked` | PASS, 50 tests, 0 failures |
 | `node tools/check-config-example.mjs` | PASS — 13 path fields, no host paths |
-| Anything in GitHub Actions | **NOT RUN** — no remote exists |
+| Anything in GitHub Actions | **NOT RUN at the time of this table** — no remote existed yet. Green on `master` since 2026-11-18; see the status note above |
 
 ### Second-machine installation: NOT PERFORMED
 
@@ -402,11 +417,11 @@ Nothing here is unfixable. Ordered by what actually stops a release.
 
 | # | Blocker | Severity | Status |
 | --- | --- | --- | --- |
-| 1 | No remote repository exists, and nothing has ever been pushed. `git remote -v` is empty, `git tag` is empty | Blocking by definition | For the maintainer |
+| 1 | No remote repository existed when this table was written, and nothing had been pushed. `git remote -v` was empty and `git tag` was empty | Blocking by definition | **Resolved 2026-11-18** — public repository created and `master` pushed; `origin` is configured. `git tag` is still empty |
 | 2 | Binaries unsigned; SmartScreen warning not observed on a clean machine | High — user trust | Documented in §8; accepted risk |
 | 3 | Installer never run on a second machine or clean image | High — the only real compatibility evidence | **Open**, cannot be closed here (§6) |
-| 4 | No CI run yet. The workflow is written and its steps were re-run by hand, but nothing has executed on GitHub, so every result in §1 is still manual and host-specific | Medium | **Open** (§6) |
-| 5 | Git author identity is `Cohen <cohen@localhost>`: commits will not link to a GitHub account | Medium — cosmetic, permanent once pushed | **Decision needed** — three options in §3 finding 3; **no history was rewritten** |
+| 4 | No CI run existed yet at the time of this table. The workflow was written and its steps had been re-run by hand, but nothing had executed on GitHub, so every result in §1 was still manual and host-specific | Medium | **Resolved 2026-11-18** — three green `master` runs on `windows-11-arm` (§6) |
+| 5 | Git author identity was `Cohen <cohen@localhost>`: commits would not link to a GitHub account | Medium — cosmetic, permanent once pushed | **Resolved 2026-11-18** — later commits use `Cohen Skocny <117538498+cohenskocny@users.noreply.github.com>`. **No history was rewritten**, so earlier commits keep the old address |
 | 6 | SmartScreen behaviour on a clean machine for an unsigned low-prevalence installer | Medium | **NOT TESTED** |
 | 7 | Automatic blackout and the battery refusal were not re-run from the installed package | Low — tested in the dev build and at unit level | **Open** |
 | 8 | `qa-screenshots/display-idle-visible-window.png` is 4.8 MB, 65 % of repository size | Low — cosmetic | Accepted, with the JPEG recommendation in §3 |
@@ -420,18 +435,23 @@ configuration, now shipped and covered by a test (§10).
 
 ## 10. Exact steps to publish v0.1.0
 
-Assumes the corrections in this audit are committed on `master` and that you have
-decided on §3 finding 5 and §8.
+**Status 2026-11-18:** the corrections in this audit are committed on `master`.
+Steps 1, 3, 5 and 6 are done and the private-vulnerability half of step 7 is done;
+step 2 was permanently skipped when the first push happened and the history was
+left unrewritten; step 4 was not needed, because the §1 artifacts still verify;
+step 8 has not been started. §8 (code signing) is still the owner's decision. The
+sequence is kept as the record of what was required, with completed steps marked.
 
 ```bash
 # 0. In the repository root, on the build host
 
-# 1. Decide the public author identity (once, before the first push).
+# 1. DONE 2026-11-18. The public author identity is set before the first push.
 git config user.name  "<public name>"
 git config user.email "<you>@users.noreply.github.com"
 
-# 2. Optional but recommended while no remote exists: normalise the history so
-#    every commit carries that identity.
+# 2. History normalisation was only possible before the first push. The remote now
+#    exists and the history has deliberately not been rewritten, so this step is
+#    permanently skipped. See §3 finding 3 and §9 row 5.
 #    git filter-repo --commit-callback 'commit.author_name = b"<public name>"; ...'
 
 # 3. Confirm a clean tree and that the suite still passes from scratch.
@@ -449,7 +469,7 @@ npm run release:build
 sha256sum -c release/v0.1.0/SHA256SUMS.txt
 #    and rescan for build-host strings -- the audit's scan must still report 0.
 
-# 6. Create the empty public repository on GitHub, then:
+# 6. DONE 2026-11-18. The public repository was created and master pushed.
 git remote add origin https://github.com/cohenskocny/rtx-spark-ai-control.git
 git push -u origin master
 
