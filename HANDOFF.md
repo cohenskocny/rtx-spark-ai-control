@@ -1,13 +1,17 @@
 # HANDOFF — RTX Spark AI Control V2
 
-Updated: 2026-11-18 (public documentation milestone complete)
+Updated: 2026-11-18 (release packaging complete)
 
 ## Status
 
 Phase 3 implementation is complete and committed. The public documentation set is
-committed. **The next milestone is release packaging** — installer, generated
-licence inventory, CI, repository audit and publishing. Nothing has been pushed,
-tagged or released, and there is no GitHub repository yet.
+committed. The Setup dependency defect is fixed. A Windows ARM64 installer for
+**v0.1.0** has been built, installed, launched and uninstalled successfully on this
+machine.
+
+**The next milestone is publication** — code signing, a public repository, a
+second-machine install test, then the tag. Nothing has been pushed, tagged or
+released, and there is no GitHub repository yet.
 
 Branch `master`. Baseline for Phase 3 was `ade8ca0`.
 
@@ -24,99 +28,166 @@ Branch `master`. Baseline for Phase 3 was `ade8ca0`.
 | `978c04d` | `tools/shot.ps1` webview capture |
 | `929b96a` | refreshed captures plus the four Phase 3 screenshots |
 | `60ba062` | Phase 3 recovery handoff |
-| `b144ce8` | **documentation set for 0.1.0** |
+| `b144ce8` | documentation set for 0.1.0 |
+| `cb10292` | handoff pointed at release packaging |
+| `6b07b84` | **blackout became optional; Setup no longer blocks on it** |
+| `b091934` | 20 PNG screenshots replaced by 8 optimised JPEGs |
+| `9fc2a4c` | generated transitive licence inventory |
+| `22b901b` | v0.1.0 installer manifest, checksums and verification record |
 
-## Done in the documentation milestone
+## Done in the packaging session
 
-- **The eight promised documents exist**: `INSTALL.md`, `CONFIGURATION.md`,
-  `TROUBLESHOOTING.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
-  `THIRD-PARTY-NOTICES.md`, `LICENSE`. Every relative link and anchor across the
-  twelve Markdown files resolves; every referenced repository path exists.
-- **Licence: MIT**, for this application's own code, styles and generated icons.
-  Compatibility was checked rather than assumed: every direct Rust and JavaScript
-  dependency declares MIT or Apache-2.0 (`tauri`, `tauri-build`, `serde`,
-  `serde_json`, `ureq`, `windows-sys`, `@tauri-apps/api`, `@tauri-apps/cli`,
-  `react`, `react-dom`, `vite`, `@vitejs/plugin-react`, `typescript`). Upstream
-  native-vLLM is Apache-2.0 and external — not bundled, not modified, so no NOTICE
-  obligation attaches to this repository. No permission, licence text or notice is
-  invented anywhere; `THIRD-PARTY-NOTICES.md` quotes what each manifest says and
-  marks the transitive inventory as still to be generated.
-- **README corrected against the source.** It had claimed a prebuilt installer that
-  does not exist, called the blackout guard a PowerShell script, claimed the guard
-  **suppresses input** (it does not — its own source says nothing is hooked or
-  blocked, and any input removes the overlay), listed "log files" on the Logs page
-  (it shows the event ring and the server's output tail), and called 0.1.0 a first
-  public release when nothing is published. All five are fixed, and
-  `SECURITY.md` now describes a curtain over an unlocked desktop rather than
-  implying a lock.
-- **Tested and unverified are separated by name** throughout: README §3 lists the
-  untested platform/model combinations, §9 labels every measurement with its
-  condition, `INSTALL.md` marks the NSIS installer path unverified, `CHANGELOG.md`
-  carries a "Not in this version" section.
-- **Private information removed**: the working directory and a local git identity
-  were scrubbed from `HANDOFF.md`, `RECOVERY-STATUS.md` and `TEST-RESULTS.md`. The
-  source tree contained none — no credentials, tokens or personal paths.
-- **Battery, OLED, Modern Standby, the security trade-off and the battery gate**
-  are documented where a reader will look for them: README §6–§8,
-  `SECURITY.md` §3 and §7, `TROUBLESHOOTING.md`.
+### 1. Setup dependency defect (committed separately, `6b07b84`)
 
-### Found while documenting, documented rather than fixed
+The save required `blackout_engine` and `blackout_python` even for a user who only
+wants vLLM management. Now:
 
-- The Setup save requires **every** non-optional field, including
-  `blackout_engine` and `blackout_python`. A machine with a working vLLM but no
-  guard script cannot complete that save. Recorded in `CONFIGURATION.md` §2 and
-  `TROUBLESHOOTING.md` as current behaviour. Relaxing it is an application change,
-  so it was not made in a documentation session.
-- `logs_dir` is stored but nothing writes there; the event ring lives in memory.
-  Documented as such in `CONFIGURATION.md` §6.
+- `paths.rs`: guard fields are optional kinds, and a new `IfSetFile` / `IfSetExe`
+  pair means "may be empty, but a value that is present must exist" — optional
+  stopped being "anything goes". `Paths::guard_interpreter()` falls back to
+  `python_exe`. Three new Rust tests, including one that runs the exact
+  `config_set` validation sweep over a vLLM-only configuration.
+- `main.rs`: `blackout_unavailable()` gates `blackout_now`, `blackout_auto(true)`
+  and `follow_server(true)`; disabling is always allowed. The message says vLLM
+  management is unaffected and never suggests installing anything.
+- `supervisor.rs`: arming is gated on `blackout_ready()`; automation reports an
+  `"unavailable"` phase with a reason instead of retrying every tick.
+- Frontend: `src/lib/optional.ts` (`blackoutAvailability`, `blackoutBlockedReason`)
+  with four tests, `Blackout.tsx` headline and disabled controls, `Setup.tsx`
+  optional labels and a three-state pill.
+- Existing installations with both guard paths set behave exactly as before. No
+  Python and no guard script is installed on the user's behalf, ever.
+
+### 2. Release build and installer
+
+`npm run tauri build`, exit 0, native `aarch64-pc-windows-msvc`.
+
+| Artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| `RTX Spark AI Control_0.1.0_arm64-setup.exe` | 1,543,842 | `50c785282a92fed63e7f64d4c76aa3df234a1a0474131f1d424f46f1c50daa3f` |
+| `rtx-spark-ai-control-v2.exe` (pre-bundle) | 5,280,768 | `61ffb34b9fb1f239d7184fc754f379996a159d6ad2d2b8e26208f20624fb517f` |
+| `rtx-spark-ai-control-v2.exe` (as installed) | 5,280,768 | `c69baeb572760444092e58e86ff59a60c631a3d2cdacf87f806755b9b6cd759c` |
+
+**NSIS over MSI**, because it was already the configured target, installs per user
+with no elevation prompt, and can be driven silently for testing. The installed
+executable differs from the build-tree one by three bytes at offset 4,953,567:
+Tauri rewrites its `__TAURI_BUNDLE_TYPE_VAR_UNK` marker to `..._NSS` so the app
+knows it came from a bundle. Both hashes are recorded so nobody has to guess.
+
+Artifacts stay out of Git in an archive directory beside the repository. The
+manifest and a machine-readable checksum file are in
+[release/v0.1.0/](release/v0.1.0/RELEASE-MANIFEST.md).
+
+**The blackout engine remains an optional external dependency.** Bundling a Python
+runtime and an untested display-control script inside a 1.5 MB installer would
+create a dependency that could not be verified here.
+
+### 3. Installer verification
+
+Run in a throwaway directory, twice installed and uninstalled:
+
+- silent install with `/S /D=<dir>` → exit 0; nothing written outside that
+  directory; Start Menu shortcut and one `HKCU` uninstall entry created
+- first run with no settings file → Setup page, pill row `SETUP NEEDED` /
+  `BLACKOUT OPTIONAL` / `ON BATTERY · LAUNCH BLOCKED`; bundled frontend renders
+  (no dev-server URL, no blank window)
+- second launch while running → still one process
+- vLLM-only `settings.json` with both blackout paths empty → interface fully
+  usable, Blackout page explains what is missing, settings file left untouched
+- no interpreter and no model started: `python` process count unchanged, `vllm`
+  count 0
+- silent uninstall → program directory, shortcut and registry entry removed; user
+  settings preserved
+
+### 4. Repository hygiene
+
+- Screenshots: 20 PNGs / 65 MB → 8 JPEGs / 1.2 MB, originals archived outside the
+  repository, `tools/optimize-shots.ps1` does the conversion.
+- Licence inventory: `node tools/licence-inventory.mjs` writes
+  [DEPENDENCIES.md](DEPENDENCIES.md) from both lock files — 456 Rust packages (300
+  compiled here, 156 other-platform-only) and 128 JavaScript packages. Every
+  compiled dependency offers a permissive option; five crates are MPL-2.0 and
+  unmodified; nothing is GPL or AGPL only.
+- The release manifest had picked up the local build path and the test directory;
+  both were genericised before committing. `logs/` stays gitignored.
+
+### 5. Documentation updated for the package
+
+`INSTALL.md` (build the installer, install, verify the hash, silent forms,
+uninstall), `TROUBLESHOOTING.md` (new "Installer and uninstall" section),
+`SECURITY.md` §9 (GitHub private vulnerability reporting, with no invented
+address) and §10 (unsigned binaries), `CHANGELOG.md` (Packaging section, corrected
+"Not in this version"), `CONTRIBUTING.md` (the two generated files), `README.md`
+(installer exists but is unpublished; new Setup screenshot), `TEST-RESULTS.md`
+(screenshot row), `THIRD-PARTY-NOTICES.md` (links the generated inventory).
 
 ## Verified in this session
 
-- `npm run test:web`: **20 passed, 0 failed**. `npx tsc --noEmit`: clean.
-- Link and anchor validation across all twelve Markdown files: **all resolve**.
-  Referenced repository paths: **all exist**.
-- Rust suite **not re-run**: no Rust code changed in this session; it passed 46/46
-  at `60ba062`.
+- `cargo test --manifest-path src-tauri\Cargo.toml` — **49 passed, 0 failed**
+- `npm run test:web` — **24 passed, 0 failed**
+- `npx tsc --noEmit` — clean, no diagnostics
+- `npm run build` — 52 modules, 473 ms
+- `npm run tauri build` — exit 0, installer produced, hashes recorded
+- Install / first run / single instance / vLLM-only config / uninstall — see §3
+- Links and anchors across all 13 Markdown files, plus every `npm run` reference
+  against `package.json` — all resolve
 - **No inference engine was started, stopped, restarted or loaded.** No CUDA work,
-  no inference request, no power-setting change; the machine stayed on battery.
+  no inference request, no power-setting change, no driver or ASUS change; the
+  machine stayed on battery throughout.
 
-## Next milestone: release packaging
+## NOT TESTED
+
+- Installer on a **second machine** or a clean Windows ARM64 image — one host only.
+- Installer on **x64 Windows** — the package is ARM64 only and is expected to
+  refuse; that expectation was not run.
+- The **battery gate refusing an actual start** — the gate was visible
+  (`ON BATTERY · LAUNCH BLOCKED`) and is covered by unit tests, but no live launch
+  was attempted on battery.
+- **Automatic blackout from the installed package** — it passes in the development
+  build (TEST-RESULTS §3b); the packaged build was not re-exercised with a guard.
+- **Signature and SmartScreen reputation** — the binaries are unsigned.
+- **Update check against a real new upstream release** — only cached and
+  absent-cache behaviour was exercised.
+- **CI** — no workflow exists.
+
+## Next milestone: publication
 
 In order, because each step depends on the one above:
 
-1. **Third-party licence inventory.** Generate the transitive list from
-   `Cargo.lock` (456 packages) and `package-lock.json` with `cargo-about` or
-   `cargo-deny` plus a JS licence checker, and bundle the licence texts a
-   distributable should carry. `THIRD-PARTY-NOTICES.md` currently covers direct
-   dependencies only, and says so.
-2. **Release build and installer.** `npm run tauri build` → per-user NSIS
-   (`installMode: "currentUser"`, already configured). Then record the binary size
-   and SHA-256, and actually install, launch and uninstall it on a clean profile.
-   The installer path is **unverified today**; `INSTALL.md` and `README.md` say so.
-3. **Continuous integration.** A Windows ARM64 workflow that runs `cargo test`,
-   `npm run test:web`, `tsc --noEmit` and the frontend build. Confirm runner
-   availability for `windows-11-arm` before writing the badge.
-4. **Repository audit.** Secrets and personal-path scan, `.gitignore` review
-   (`logs/`, `dist/`, `src-tauri/target/`, `results/`, `qa-screenshots`), and the
-   size decision in §"Open decisions".
-5. **Publish.** Create the repository, tag `v0.1.0`, and use `CHANGELOG.md` as the
-   release notes. Remove the "unreleased" wording from `README.md`, `CHANGELOG.md`
-   and `SECURITY.md` in the same commit that tags.
-6. **Then** the deferred verification: foreground idle cost for the two new pages,
-   the three-request inference probe and real-server lifecycle on AC power, and
-   Windows x64.
+1. **Code signing.** An unsigned installer from an unknown publisher is the single
+   biggest obstacle to anyone else installing this. Obtain a certificate, wire
+   `bundle.windows.certificateThumbprint` (or a CI secret), rebuild, re-record the
+   hashes, and confirm SmartScreen behaviour changes.
+2. **Second-machine install test.** Fresh Windows 11 ARM64, no Rust toolchain, no
+   vLLM: install, first run, configure against a mock, uninstall. Record it in
+   `TEST-RESULTS.md` and the manifest's test matrix.
+3. **Decide the blackout engine's future.** Current position: external and
+   optional for v0.1.0. Bundling is a separate milestone that needs a tested
+   runtime.
+4. **Continuous integration.** A Windows ARM64 workflow running `cargo test`,
+   `npm run test:web`, `tsc --noEmit`, the frontend build and, on tags, the Tauri
+   bundle. Confirm `windows-11-arm` runner availability before writing a badge.
+5. **Repository audit and creation.** Secret and personal-path scan of the full
+   history (not just the working tree), `.gitignore` review, then create the
+   repository and enable **Settings → Code security → Private vulnerability
+   reporting**, which `SECURITY.md` §9 already tells reporters to use.
+6. **Publish.** Tag `v0.1.0`, attach the installer and `SHA256SUMS.txt`, use
+   `CHANGELOG.md` as release notes, and remove the "unreleased" wording from
+   `README.md`, `CHANGELOG.md` and `SECURITY.md` in the same commit that tags.
+7. **Then** the deferred verification: foreground idle cost for the new pages, the
+   three-request inference probe and a real-server lifecycle on AC power, and
+   Windows x64 behaviour.
 
 ## Open decisions for the owner
 
-- **`screenshots/` is ~65 MB**, most of it Phase 2 duplicates at full device scale.
-  The four Phase 3 captures add ~8.6 MB. Publishing that is a choice about
-  repository size; the Phase 3 set is isolated in `929b96a` if you want it out.
-- **The Setup save requiring guard paths** — documented, not changed. Decide
-  whether it should be relaxed before 0.1.0 is published.
-- **Security contact.** `SECURITY.md` §9 deliberately says no address is published
-  yet. Pick a channel (private advisory, or an address you are willing to make
-  public) when the repository goes up.
-- **Supported-versions policy** — currently "the only line is 0.1.0, and it is
+- **Signing certificate**: which publisher identity, and whether to buy one or
+  ship unsigned with a documented hash-only check.
+- **Screenshot size**: resolved for the tracked set (1.2 MB). Full-resolution
+  originals stay outside the repository by choice.
+- **Security contact**: `SECURITY.md` §9 now names GitHub private vulnerability
+  reporting as the channel and deliberately publishes no address. Nothing to do
+  until the repository exists.
+- **Supported-versions policy**: currently "the only line is 0.1.0, and it is
   unpublished".
 
 ## Rules that still hold
@@ -126,14 +197,27 @@ In order, because each step depends on the one above:
 - Never modify the production model, the native-vLLM environment, the checkpoint,
   the NVIDIA driver, ASUS settings or the OLED power configuration.
 - No push, no public repository, no release without explicit approval.
+- Generated files are not hand-edited: `DEPENDENCIES.md` comes from
+  `tools/licence-inventory.mjs`, the JPEGs from `tools/optimize-shots.ps1`.
 
 ## Next commands
 
 ```powershell
 cd <repository>
-npm run test:web                       # 20 frontend tests
-npm run build                          # typecheck + bundle
-cargo test --manifest-path src-tauri\Cargo.toml   # 46 Rust tests
-npm run app:dev                        # development window (CDP on 9222 optional)
+cargo test --manifest-path src-tauri\Cargo.toml   # 49 Rust tests
+npm run test:web                                  # 24 frontend tests
+npx tsc --noEmit                                  # typecheck only
+npm run build                                     # frontend bundle
+npm run tauri build                               # release binary + NSIS installer
+node tools\licence-inventory.mjs                  # regenerate DEPENDENCIES.md
 powershell -File tools\shot.ps1 -Out screenshots\x.png -Page Updates -Scale 0.667
+powershell -File tools\optimize-shots.ps1 -Src <archive> -Out screenshots
+```
+
+The installed package can be smoke-tested without touching real settings or the
+inference environment by pointing `V2_TEST_DATA_DIR` at a throwaway directory:
+
+```powershell
+$env:V2_TEST_DATA_DIR = "$env:TEMP\rtx-v2-smoke"
+& "$env:LOCALAPPDATA\RTX Spark AI Control\rtx-spark-ai-control-v2.exe"
 ```
