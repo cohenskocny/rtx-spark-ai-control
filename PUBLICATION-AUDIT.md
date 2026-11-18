@@ -386,7 +386,7 @@ Assumes the corrections in this audit are committed on `master` and that you hav
 decided on §3 finding 5 and §8.
 
 ```bash
-# 0. In C:\Users\cohen\AI\RTX-Spark-AI-Control-V2
+# 0. In the repository root, on the build host
 
 # 1. Decide the public author identity (once, before the first push).
 git config user.name  "<public name>"
