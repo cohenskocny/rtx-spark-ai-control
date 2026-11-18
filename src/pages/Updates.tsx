@@ -1,61 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot, UpstreamView } from "../lib/types";
 import { Card, Pill, Row, SectionHead } from "../components/primitives";
-import { age, clockTime } from "../lib/format";
+import { age } from "../lib/format";
 import { errorText, upstream } from "../lib/api";
-
-/** `2026-11-07T20:10:43Z` → `2026-11-07`; anything unparseable is shown as given. */
-function day(iso: string): string {
-  if (!iso) return "—";
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toISOString().slice(0, 10);
-}
-
-function stamp(ms: number | null): string {
-  if (!ms) return "—";
-  return `${day(new Date(ms).toISOString())} ${clockTime(ms)}`;
-}
-
-/** The check itself: never / ok / offline / rate-limited / error. */
-function checkPill(status: string): {
-  tone: "live" | "loading" | "offline" | "idle";
-  text: string;
-} {
-  if (status === "ok") return { tone: "live", text: "reachable" };
-  if (status === "offline") return { tone: "offline", text: "offline" };
-  if (status === "rate-limited") return { tone: "loading", text: "rate limited" };
-  if (status === "error") return { tone: "offline", text: "check failed" };
-  return { tone: "idle", text: "not checked" };
-}
-
-/** What the newest upstream release means *for this machine*. */
-function compatPill(status: string): {
-  tone: "live" | "loading" | "offline" | "idle";
-  text: string;
-} {
-  if (status === "current") return { tone: "live", text: "compatible" };
-  if (status === "update-available") return { tone: "loading", text: "newer upstream" };
-  if (status === "ahead") return { tone: "idle", text: "local ahead" };
-  if (status === "unsupported-platform") return { tone: "offline", text: "not supported" };
-  return { tone: "idle", text: "unknown" };
-}
-
-/**
- * Release notes arrive as GitHub-flavoured markdown. Rendering it as HTML would
- * mean shipping a renderer for text this page only ever reads, so the two things
- * that actually hurt legibility are folded away: inline links keep their label,
- * and code fences keep their content.
- */
-function readableNotes(raw: string): string {
-  return raw
-    .replace(/```[a-zA-Z]*\n?/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/^\s*Full Changelog:.*$/gim, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
+import { checkPill, compatPill, day, quota, readableNotes, stamp } from "../lib/present";
 
 export function Updates({ snap, refresh }: { snap: Snapshot | null; refresh: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -215,11 +163,7 @@ export function Updates({ snap, refresh }: { snap: Snapshot | null; refresh: () 
             <Row k="Next automatic" v={view?.next_auto_ms ? stamp(view.next_auto_ms) : "on next launch"} />
             <Row
               k="GitHub quota"
-              v={
-                view?.rate.remaining === null || view?.rate.remaining === undefined
-                  ? "—"
-                  : `${view.rate.remaining} of ${view.rate.limit ?? "?"} left`
-              }
+              v={quota(view?.rate.remaining ?? null, view?.rate.limit ?? null)}
             />
           </div>
           <div className="note" style={{ marginTop: 12 }}>
