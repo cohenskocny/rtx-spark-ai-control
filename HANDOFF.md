@@ -1,6 +1,6 @@
 # HANDOFF — RTX Spark AI Control V2
 
-Updated: 2026-11-18 (AI-assisted installation milestone added; CI still unrun, nothing pushed)
+Updated: 2026-11-18 (repository published to GitHub; first Windows ARM64 CI run passed)
 
 ## Status
 
@@ -9,20 +9,30 @@ committed. The Setup dependency defect is fixed. A Windows ARM64 installer for
 **v0.1.0** has been built, installed, launched and uninstalled successfully on this
 machine.
 
-**The next milestone is publication** — code signing, a public repository, a
-second-machine install test, then the tag. Nothing has been pushed, tagged or
-released, and there is no GitHub repository yet.
+**The next milestone is release** — code signing, a second-machine install test,
+then the tag. The repository is public and CI runs green; **no tag has been
+created, no release has been drafted on GitHub, and no installer has been
+uploaded.**
 
-CI now exists as a file (`.github/workflows/ci.yml`) and **has never been run**.
-There is no remote to run it against. Treat every test result in this repository
-as a local result until a GitHub Actions run appears.
+## Publication state
 
-The Git author identity is still `Cohen <cohen@localhost>` on all 33 commits. That
-is a deliberate open decision, not an oversight — three options are compared in
-[PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md) §3 finding 3, and **no history was
-rewritten**. As of this session the local `user.name` is `Cohen Skocny` for
-future commits; the e-mail is untouched because the GitHub noreply address has
-not been verified.
+| Item | State |
+| --- | --- |
+| Repository | <https://github.com/cohenskocny/rtx-spark-ai-control> (public) |
+| Remote | `origin`, HTTPS, tracks `master` |
+| Pushed commit | `c861aa23c126d1666aea39223ddecb3d8d4454c2` |
+| CI | workflow `ci`, run [44398122737](https://github.com/cohenskocny/rtx-spark-ai-control/actions/runs/44398122737), **success** on `c861aa2` |
+| CI steps | all green: checkout, Node 26.13.1, Rust 1.98.0 aarch64-pc-windows-msvc, `npm ci` from the lock file, 24 frontend tests, `tsc --noEmit` + build, 50 Rust tests, config-example validation |
+| Security | private vulnerability reporting enabled; Actions default token permissions `read`, PR approval by Actions off |
+| Release workflows | none exist — nothing can publish itself |
+| Tags / releases | none |
+| Code signing | none — installer and executable are unsigned |
+
+The Git author identity for commits after this point is `Cohen Skocny
+<117538498+cohenskocny@users.noreply.github.com>`, set with `git config --local`
+only. The 33 pre-existing commits still carry `Cohen <cohen@localhost>`; that is a
+deliberate open decision compared in [PUBLICATION-AUDIT.md](PUBLICATION-AUDIT.md)
+§3 finding 3, and **no history was rewritten**. Global Git settings are untouched.
 
 ## AI-assisted installation milestone (2026-11-18)
 
@@ -344,21 +354,21 @@ In order, because each step depends on the one above:
 3. **Decide the blackout engine's future.** Current position: external and
    optional for v0.1.0. Bundling is a separate milestone that needs a tested
    runtime.
-4. **Continuous integration — written, not yet run.** `.github/workflows/ci.yml`
+4. **Continuous integration — DONE, green.** `.github/workflows/ci.yml`
    runs `npm ci`, `npm run test:web`, `npm run build`, `cargo test --locked` and
    the example-configuration check on `windows-11-arm`, with Node.js 26.13.1 and
    Rust 1.98.0 pinned. It deliberately does not sign, bundle, upload or publish.
-   The first run happens after step 5 creates the repository; expect the clean
-   `npm ci` to be the first thing to break. No badge until a run is green.
-   Check the `windows-11-arm` label against GitHub's hosted-runner reference again
-   at that point, since hosted images change without notice.
-5. **Repository audit and creation.** Secret and personal-path scan of the full
-   history (not just the working tree), `.gitignore` review, then create the
-   repository and enable **Settings → Code security → Private vulnerability
-   reporting**, which `SECURITY.md` §9 already tells reporters to use.
-6. **Publish.** Tag `v0.1.0`, attach the installer and `SHA256SUMS.txt`, use
-   `CHANGELOG.md` as release notes, and remove the "unreleased" wording from
-   `README.md`, `CHANGELOG.md` and `SECURITY.md` in the same commit that tags.
+   First run [44398122737](https://github.com/cohenskocny/rtx-spark-ai-control/actions/runs/44398122737)
+   passed on `c861aa2`; the clean `npm ci` that was expected to break first did
+   not. A badge is now defensible.
+5. **Repository audit and creation — DONE.** Secret and personal-path scan of the
+   full history, `.gitignore` review, public repository created, `master` pushed,
+   **Settings → Code security → Private vulnerability reporting** enabled, and
+   workflow token permissions reduced to read-only.
+6. **Publish — NOT STARTED, needs the owner.** Tag `v0.1.0`, attach the installer
+   and `SHA256SUMS.txt`, use `CHANGELOG.md` as release notes, and remove the
+   "unreleased" wording from `README.md`, `CHANGELOG.md` and `SECURITY.md` in the
+   same commit that tags. Nothing has been tagged, drafted or uploaded.
 7. **Then** the deferred verification: foreground idle cost for the new pages, the
    three-request inference probe and a real-server lifecycle on AC power, and
    Windows x64 behaviour.
@@ -375,10 +385,10 @@ In order, because each step depends on the one above:
 - **Screenshot size**: resolved for the tracked set (1.2 MB). Full-resolution
   originals stay outside the repository by choice.
 - **Security contact**: `SECURITY.md` §9 now names GitHub private vulnerability
-  reporting as the channel and deliberately publishes no address. Nothing to do
-  until the repository exists.
+  reporting as the channel and deliberately publishes no address. Private
+  vulnerability reporting is enabled on the published repository.
 - **Supported-versions policy**: currently "the only line is 0.1.0, and it is
-  unpublished".
+  unreleased".
 
 ## Rules that still hold
 
@@ -386,7 +396,8 @@ In order, because each step depends on the one above:
   `tools/mock-vllm.py` for anything that needs a server.
 - Never modify the production model, the native-vLLM environment, the checkpoint,
   the NVIDIA driver, ASUS settings or the OLED power configuration.
-- No push, no public repository, no release without explicit approval.
+- No release, tag, installer upload or publish without explicit approval. The
+  repository itself is now public and CI is expected to stay green there.
 - Generated files are not hand-edited: `DEPENDENCIES.md` comes from
   `tools/licence-inventory.mjs`, the JPEGs from `tools/optimize-shots.ps1`.
 

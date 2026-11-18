@@ -116,12 +116,18 @@ The v0.1.0 asset is named `RTX Spark AI Control_0.1.0_arm64-setup.exe`.
 - If no release is published yet, say so plainly and stop this path. Offer the
   source build in INSTALL.md section 2 instead. Do not substitute a build you
   find elsewhere.
-- Read the expected SHA-256 from the release's own `SHA256SUMS.txt` asset, or
-  from `release/v0.1.0/RELEASE-MANIFEST.md` section 2 in the repository. The
-  manifest records
+- Read the expected SHA-256 from the release's own `SHA256SUMS.txt` asset. That
+  asset is authoritative: it describes the exact file attached to the release.
+- The in-repository record is `release/v0.1.0/RELEASE-MANIFEST.md` section 2.
+  It currently states
   `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6`
-  for the v0.1.0 installer. If you cannot fetch a published hash, say the file
-  is unverified instead of trusting a hash I paste — and say why.
+  for the v0.1.0 installer — the build-time value from the 0.1.0 build. If the
+  artifacts are rebuilt before publication, that number changes and the manifest
+  is regenerated with it. So treat the release asset as the source of truth, and
+  a repository value that disagrees with it as a stale build record, not as
+  evidence of tampering. Say which of the two you compared against.
+- If you cannot fetch a published hash, say the file is unverified instead of
+  trusting a hash I paste — and say why.
 
 ### A2. Verify the file before anything runs (read-only)
 
