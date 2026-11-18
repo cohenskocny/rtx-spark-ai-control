@@ -42,7 +42,7 @@
     powershell -File tools\verify-install.ps1
 
 .EXAMPLE
-    powershell -File tools\verify-install.ps1 -InstallerPath "$env:USERPROFILE\Downloads\RTX Spark AI Control_0.1.0_arm64-setup.exe"
+    powershell -File tools\verify-install.ps1 -InstallerPath "$env:USERPROFILE\Downloads\RTX-Spark-AI-Control_0.1.0_arm64-setup.exe"
 
 .NOTES
     Exit codes: 0 verified, 1 a required check failed, 2 unsupported platform,

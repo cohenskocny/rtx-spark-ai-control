@@ -487,7 +487,7 @@ Release assets for `v0.1.0`:
 
 | Asset | Path on the build host | SHA-256 |
 | --- | --- | --- |
-| `RTX Spark AI Control_0.1.0_arm64-setup.exe` | `src-tauri/target/release/bundle/nsis/` | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` | `src-tauri/target/release/bundle/nsis/` | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
 | `rtx-spark-ai-control-v2.exe` | `src-tauri/target/release/` | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
 | `SHA256SUMS.txt` | `release/v0.1.0/` | (text) |
 

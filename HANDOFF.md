@@ -117,7 +117,7 @@ New artifact hashes (the previous manifest's hashes are superseded):
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `RTX Spark AI Control_0.1.0_arm64-setup.exe` | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
 | `rtx-spark-ai-control-v2.exe` | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
 
 
@@ -170,7 +170,7 @@ wants vLLM management. Now:
 
 | Artifact | Bytes | SHA-256 |
 | --- | --- | --- |
-| `RTX Spark AI Control_0.1.0_arm64-setup.exe` | 1,543,540 | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` | 1,543,540 | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
 | `rtx-spark-ai-control-v2.exe` (pre-bundle) | 5,276,160 | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
 | `rtx-spark-ai-control-v2.exe` (as installed) | 5,276,160 | `dcba0ea3804bcb1adf25fc188b564e5b98311dc4a6e21a88dbe56773618d63b0` |
 

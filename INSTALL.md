@@ -87,9 +87,14 @@ npm run tauri build
 `installMode: "currentUser"`. Two artifacts come out:
 
 ```text
-src-tauri\target\release\rtx-spark-ai-control-v2.exe                          5,280,768 B
-src-tauri\target\release\bundle\nsis\RTX Spark AI Control_0.1.0_arm64-setup.exe  1,543,842 B
+src-tauri\target\release\rtx-spark-ai-control-v2.exe                          5,276,160 B
+src-tauri\target\release\bundle\nsis\RTX Spark AI Control_0.1.0_arm64-setup.exe  1,543,540 B
 ```
+
+Tauri names the installer with spaces. GitHub replaces spaces in release asset names
+with dots, so the file is published as
+`RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` — the bytes are identical, and every
+reference to *downloading* the asset uses that hyphenated name.
 
 The NSIS toolchain is downloaded once into `%LOCALAPPDATA%\tauri\NSIS`. The
 installer is unsigned — there is no code-signing identity configured — so it will
@@ -98,23 +103,23 @@ download you cannot hash; verify the SHA-256 first.
 
 ### Install from the packaged installer
 
-`RTX Spark AI Control_0.1.0_arm64-setup.exe` is a per-user installer. It needs no
+`RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` is a per-user installer. It needs no
 administrator rights, installs to `%LOCALAPPDATA%\RTX Spark AI Control`, adds one
 Start Menu shortcut and one Add/Remove Programs entry, and does nothing else.
 
 ```powershell
 # interactive: double-click, or
-.\RTX Spark AI Control_0.1.0_arm64-setup.exe
+.\RTX-Spark-AI-Control_0.1.0_arm64-setup.exe
 
 # silent, into a directory of your choosing (note: /D must be last and unquoted)
-.\RTX Spark AI Control_0.1.0_arm64-setup.exe /S /D=C:\Tools\RTXSpark
+.\RTX-Spark-AI-Control_0.1.0_arm64-setup.exe /S /D=C:\Tools\RTXSpark
 ```
 
 Verify the file you are about to run:
 
 ```powershell
-Get-FileHash '.\RTX Spark AI Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
-# 50C785282A92FED63E7F64D4C76AA3DF234A1A0474131F1D424F46F1C50DAA3F
+Get-FileHash '.\RTX-Spark-AI-Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
+# 39EC4B17A2BACA830F930994889084E35E8793ABEB18306CF25F3ACB584503F6
 ```
 
 The expected hashes, the installer-type rationale, the full test matrix and the

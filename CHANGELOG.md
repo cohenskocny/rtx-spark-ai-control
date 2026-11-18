@@ -138,7 +138,7 @@ The same statements, with the evidence behind them, are in the
 
 ### Packaging
 
-- **Windows ARM64 NSIS installer** — `RTX Spark AI Control_0.1.0_arm64-setup.exe`,
+- **Windows ARM64 NSIS installer** — `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe`,
   1,543,540 bytes, SHA-256
   `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6`, per-user, no
   elevation. Chosen over MSI because it was already the configured target and

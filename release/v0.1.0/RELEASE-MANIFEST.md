@@ -48,11 +48,21 @@ with it — it is the part a downloader needs before running anything.
 
 | Artifact | File name | Bytes | SHA-256 |
 | --- | --- | --- | --- |
-| Installer (distribute this) | `RTX Spark AI Control_0.1.0_arm64-setup.exe` | 1,543,540 | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
+| Installer (distribute this) | `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe` | 1,543,540 | `39ec4b17a2baca830f930994889084e35e8793abeb18306cf25f3acb584503f6` |
 | Executable, pre-bundle | `rtx-spark-ai-control-v2.exe` | 5,276,160 | `ee57faabd6047a4e38e13e0e6f2cac7ed0e3f5a1d28721b1d6f1340ddae43990` |
 | Executable, as installed | `rtx-spark-ai-control-v2.exe` | 5,276,160 | `dcba0ea3804bcb1adf25fc188b564e5b98311dc4a6e21a88dbe56773618d63b0` |
 
-The machine-readable copy of the first two is [SHA256SUMS.txt](SHA256SUMS.txt).
+The machine-readable copy of the first two is [SHA256SUMS.txt](SHA256SUMS.txt). It
+lists the file names **as published on the release**, which is what
+`sha256sum -c SHA256SUMS.txt` matches against a download.
+
+**Why the installer's published name has hyphens.** The build writes
+`RTX Spark AI Control_0.1.0_arm64-setup.exe`, with spaces. GitHub replaces spaces
+in release asset names with dots, and there is no way to upload a name that keeps
+them. The asset is therefore published as
+`RTX-Spark-AI-Control_0.1.0_arm64-setup.exe`: same bytes, same SHA-256 above, a
+different name. This is a naming-only correction made after publication; the
+binary was not rebuilt.
 
 **Why the installed executable has a different hash.** Tauri's bundler rewrites a
 three-byte marker inside the copied executable — `__TAURI_BUNDLE_TYPE_VAR_UNK`
@@ -114,7 +124,7 @@ Installer behaviour, as observed:
 Silent forms, as used for the verification runs:
 
 ```
-"RTX Spark AI Control_0.1.0_arm64-setup.exe" /S /D=C:\path\to\install
+"RTX-Spark-AI-Control_0.1.0_arm64-setup.exe" /S /D=C:\path\to\install
 "%LOCALAPPDATA%\RTX Spark AI Control\uninstall.exe" /S
 ```
 

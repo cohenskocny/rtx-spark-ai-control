@@ -208,7 +208,7 @@ show. Compare the file's SHA-256 with
 [release/v0.1.0/SHA256SUMS.txt](release/v0.1.0/SHA256SUMS.txt) before you decide:
 
 ```powershell
-Get-FileHash '.\RTX Spark AI Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
+Get-FileHash '.\RTX-Spark-AI-Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
 ```
 
 A matching hash means the file is the one that was built and tested here. It does

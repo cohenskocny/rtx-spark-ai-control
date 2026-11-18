@@ -109,7 +109,12 @@ that be discovered? Then follow the matching path below.
 
 The only official source is <https://github.com/cohenskocny/rtx-spark-ai-control>
 and its releases page, <https://github.com/cohenskocny/rtx-spark-ai-control/releases>.
-The v0.1.0 asset is named `RTX Spark AI Control_0.1.0_arm64-setup.exe`.
+The v0.1.0 installer asset is named `RTX-Spark-AI-Control_0.1.0_arm64-setup.exe`.
+Use the name exactly as it appears on the release page: GitHub rewrites spaces in
+uploaded asset names, so the published file has hyphens where a locally built
+one has spaces. The bytes are identical. Because `SHA256SUMS.txt` lists the
+published name, `sha256sum -c SHA256SUMS.txt` works on the files as downloaded —
+do not rename anything to make a check pass.
 
 - Do not download an installer from anywhere else: not a mirror, not a file
   host, not a search result, not an attachment.
