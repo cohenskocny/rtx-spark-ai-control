@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "app:build": "tauri build --no-bundle",
-    "app:dev": "tauri dev"
+    "app:dev": "tauri dev",
+    "test:web": "node --test tests/web/"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
