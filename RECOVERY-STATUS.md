@@ -1,10 +1,9 @@
 # RECOVERY-STATUS
 
-Written at the start of a new session after the previous one stalled during context
-compaction. Purpose: state what is finished, what was broken, what changed, and how to
-verify it without the old conversation.
+Written so a future session can resume this project from disk, without the conversation.
+Updated at the end of Phase 2.
 
-**Date:** 2026-11-18 05:10-05:35 UTC (local 23:10-23:35, 2026-11-17)
+**Date:** 2026-11-18 06:45 UTC (local 2026-11-18 00:45)
 
 ---
 
@@ -12,173 +11,149 @@ verify it without the old conversation.
 
 | Item | State |
 | --- | --- |
-| Tauri 2 + Rust ARM64 app builds | **PASS** — `npm run app:build` exit 0, 20.9 s incremental |
-| GUI launches from `run.ps1` | **PASS** — 391 ms to first paint, window renders live data |
-| Frontend served from embedded `dist/` | **PASS** — page URL `http://tauri.localhost/`, not the dev URL |
-| Live telemetry correctness | **PASS** — every field cross-checked against `nvidia-smi`, `/v1/models`, `config.json`, `state.json` |
-| Idle cost | **PASS** — 7.65-10.43 % of one core across three runs; V1 was 63.8 % |
-| Read-only guarantee | **PASS** — V1 config, V1 runtime state, blackout state unchanged (checksums below) |
-| Duplicate launch | **was BROKEN — fixed this session** (see §4) |
-| `runtime-state.json` capacity error | **diagnosed, not an app defect** (see §3) |
-| Git | **not a repository** — no `.git`, so no history to recover; `.gitignore` exists |
+| Tauri 2 + Rust + React, Windows ARM64 build | **PASS** — `npm run app:build` exit 0, 25.9–26.7 s incremental, no warnings |
+| GUI launches from `run.ps1` | **PASS** — window renders live data from the production server |
+| vLLM start / stop / restart / adopt | **PASS** — scripted against a mock on port 8011 (`tools/qa-lifecycle.py`, all PASS) |
+| Failed launch handling | **PASS** — stage `exited with code 1`, traceback in the log tail, nothing left half-owned |
+| Blackout Now / Stop | **PASS** — engine starts and stops, `state.json` correct, no orphan process |
+| Automatic blackout after 180 s | **NOT TESTED** — the Windows session was locked for the whole run, and the validated engine stands down while locked |
+| Input restores the desktop | **NOT TESTED** — same reason |
+| Modern Standby absence during blackout | **NOT TESTED** — same reason |
+| Follow Server automation | **PASS** — arm after hysteresis, stand down after grace, re-arm on input (mock server) |
+| Settings persistence | **PASS** — `%APPDATA%` file round-trips across launches; UI prefs in localStorage |
+| Icon (four-point glass spark) | **DONE** — ICO with 16/24/32/48/64/128/256, PNG set, sidebar mark, candidates kept in `assets/icon-candidates/` |
+| Idle cost | **PASS** — 5.88 / 5.37 % of one core vs the 7.84 % Phase 1 baseline; no regression |
+| Production server untouched | **PASS** — pid 10644 still serving `Qwen/Qwen3.8-Flash-Next`; V1 `config.json` and `runtime-state.json` MD5s unchanged |
+| Git | **PASS** — baseline `b73bb82` plus Phase 2 commits (see §6) |
 
-The V2 read-only proof of concept is functionally complete. Nothing was re-installed, no
-model or inference setting was touched.
-
----
-
-## 2. What was already complete before this session
-
-Recovered from `README.md`, `results/`, `screenshots/` and the mission log
-`FN-Optimization/PROGRESS.md` (its V2 section was fully written, lines 932-1030):
-
-* Full source: `src-tauri/src/{main,telemetry,winproc}.rs`, 13 frontend files, 3 stylesheets.
-* Measurement harness `tools/` (`measure.py`, `contention.py`, `infer-probe.py`, `cdp.py`,
-  `capture.py`, `winsize.py`) and their raw JSON in `results/`.
-* 7 CDP screenshots at 150 % DPI in `screenshots/`, and a copy of everything in
-  `FN-Optimization/results/v2-prototype/`.
-* Progress and design documentation: project `README.md` (architecture, measurements,
-  limitations, V1 migration plan, rollback) plus the V2 section of `FN-Optimization/PROGRESS.md`.
-
-The previous session had reached its final step — it launched the release binary at
-22:50:41 local and the session died immediately afterwards. No work item was left
-half-written on disk; only verification and this report were missing.
+Read `TEST-RESULTS.md` for the item-by-item evidence, including the four unexecuted tests and
+the exact commands to run them.
 
 ---
 
-## 3. The `stored JSON document is at capacity: runtime-state.json` error
+## 2. What Phase 2 added
 
-**Not a defect in V1, V2 or the model server.** It is the harness's own session store
-refusing a write, and it is what stalled the previous conversation.
+**Backend (Rust)** — `vllm.rs` (launch/stop/restart/adopt, health, log parsing, readiness),
+`blackout.rs` (V1 engine supervision, STOP sentinel, state file), `supervisor.rs` (1 Hz loop:
+probes, idle anchoring, Follow Server hysteresis/grace, arm and stand-down), `events.rs`
+(400-entry ring with repeat collapsing), `settings.rs` (`Settings` + `OwnedServer`, atomic
+writes under `%APPDATA%`), `core.rs` (shared state, `ActionResult`, snapshots), plus
+`winproc.rs` extensions: Toolhelp snapshots, ancestor walk, command lines, tree terminate,
+`GetLastInputInfo`.
 
-* Message source: `%LOCALAPPDATA%\Programs\le-chat-desktop\resources\bin\vibe-app-server\
-  _internal\mistralai_vibe_local_harness\vibe\_storage.py:5804`, raised as
-  `HarnessStoreCapacityError` when a stored document exceeds `_MAX_DOCUMENT_BYTES`
-  (line 162, 64 MiB).
-* The `runtime-state.json` in the message is the **session document**
-  `~/.vibe/logs/session/unified/<session-id>/generations/<gen>/runtime-state.json`, not any
-  file belonging to this project. The session active during the stall
-  (`34829a5d-e794-fe53-9888-a03aff8777a6`) holds generations of 21.4 MB and 10.9 MB — the
-  conversation itself, grown past what the compaction rewrite could fit.
-* The project file with the same name, `RTX-Spark-AI-Control/runtime-state.json`, is and was
-  **2 bytes containing `{}`** (MD5 `99914b932bd37a50b983c5e7c90ae93b`), written by V1's
-  `rtxcontrol/config.py`. It has nothing to do with the error.
+**Frontend (React)** — action runner with one in-flight call and toast feedback, cursor-based
+event merge, full Server/Blackout/Settings/Logs pages, Home hero controls, `BrandMark` icon,
+contrast bump for secondary labels, `span()` duration formatting.
 
-Nothing was deleted, moved or rewritten to "fix" it — the correct response is a fresh
-session with the state recorded on disk, which is what this file is for. Future sessions
-should keep progress in project files (this one, `PROGRESS.md`) rather than relying on
-conversation history.
+**Not changed on purpose:** `blackout.py` (the validated engine), V1's `config.json`, the
+optimized YAML, the chat template, the checkpoint, the NVIDIA driver and the ASUS profile.
 
 ---
 
-## 4. Defect found and fixed this session: duplicate launch crashed
+## 3. Defects found and fixed during Phase 2
 
-**Symptom.** Starting the app a second time exited with `0xC0000409`
-(`STATUS_STACK_BUFFER_OVERRUN`, the code `panic = "abort"` produces) and wrote two
-`BEX64` Windows Error Reporting entries at 23:18:35 and 23:18:43 local. Because the binary
-is `windows_subsystem = "windows"`, the failure was completely silent: no window, no
-console, no message. A second instance cannot share the WebView2 browser profile, so it
-aborts inside the loader.
+### 3.1 Adoption could climb into an unrelated Python parent
 
-**Fix.** A per-session named mutex (`Local\RTXSparkAIControlV2`) is claimed at the top of
-`main()`. On contention the second process restores the existing window and exits 0
-instead of crashing — the same guarantee V1 gets from its single-instance mutex.
+*Symptom.* `Take ownership` walked from the port listener up to any ancestor whose executable
+name was `python.exe` / `pythonw.exe` / `*vllm*`, and Stop then terminated that tree. In a
+test where the server had been started by a Python harness, adopting killed the harness — the
+one thing V1's ownership model forbids.
 
-* `src-tauri/src/main.rs`: added `claim_single_instance()` and `focus_existing()`, called
-  before any Tauri state is built. The mutex handle is deliberately never closed; Windows
-  releases it when the owning process exits.
-* `src-tauri/Cargo.toml`: added `Win32_Security` (needed to expose `CreateMutexW`) and
-  `Win32_UI_WindowsAndMessaging` (`FindWindowW`, `ShowWindow`, `SetForegroundWindow`) to
-  `windows-sys`. No new crates, no network access needed.
+*Fix.* `winproc::process_cmdline()` reads another process's command line through
+`NtQueryInformationProcess` + `ReadProcessMemory` (PEB → `ProcessParameters` → `CommandLine`,
+`raw-dylib` links, no new crates). `adopt()` now widens only while the ancestor's command line
+names `vllm.exe` or `vllm.entrypoints`, and stops at the first ancestor that does not.
 
-**Evidence after the fix.**
+*Verified.* The harness survived; the adopted listener was the only process stopped; the
+production listener's command line (`… vllm.exe serve …`) still resolves to the outermost
+`vllm.exe`, which is the intended root for a stop.
 
-| Check | Result |
-| --- | --- |
-| Second launch while first is running | exits code **0**, first instance keeps running |
-| Process count after two launches | **1** |
-| Minimised first window after second launch | **restored** (`IsIconic` false) |
-| New WER crash entries after the fix | **0** (both entries predate it, 23:18) |
-| Rebuild | exit 0, 20.9 s, binary 4,674,048 B (was 4,672,000 B) |
+### 3.2 A fabricated "Weight loading 100 %"
 
-**Known limit:** raising to the foreground is best-effort. Windows' foreground lock refuses
-`SetForegroundWindow` when the caller was not itself started by the foreground process; the
-restore from minimised works regardless. Taskbar click remains the reliable way to raise it.
+*Symptom.* An already-running external server showed a full progress bar and
+"Weight loading 100 %" because a healthy probe saturated the progress field.
 
----
+*Fix.* `apply_health` only saturates an *observed* progress value
+(`progress_pct = progress_pct.map(|_| 100.0)`); the bar is active only while starting, loading
+or stopping; the caption reads `Ready — /v1/models answered in N ms`.
 
-## 5. Verification performed this session
+### 3.3 Follow Server logged an event while switched off
 
-Rebuilt from source rather than trusting the existing binary, then checked against the live
-system. Frontend hashes are unchanged from the pre-recovery build (`index-Bvt_8JHK.js`
-173.49 kB, `index-CfvcuKrH.css` 16.89 kB), so the fix touched no UI code.
+*Symptom.* "Inference server healthy for 60 s; Follow Server may arm blackout" appeared in the
+Logs page with Follow Server off (the health state is tracked regardless, for the phase text).
 
-| Check | Method | Result |
-| --- | --- | --- |
-| Build reproduces | `npm run app:build` | exit 0; `tsc --noEmit` clean |
-| Embedded assets, not dev URL | CDP `/json` target | url `http://tauri.localhost/` |
-| Home page | CDP DOM read | model ready, health 4 ms, uptime 8h 10m, pid 10644 `python.exe`, VRAM 93.7 of 96.0 GiB, 754 MHz, 1.9 W, reason `reliability` |
-| Server page | CDP DOM read | `Qwen/Qwen3.8-Flash-Next`, listening yes (loopback), GET /v1/models 200 in 1 ms |
-| Blackout page | CDP DOM read | phase `disabled`, display request not held, 180 s, follow-server off, cover internal, state written `2026-11-18T04:00:01Z` — matches `state.json` |
-| Settings page | CDP DOM read | 2 s interval, last poll 75 ms, sampling active, startup 474 ms |
-| Throttle decode | `format.ts` table vs `nvidia-smi` | raw `0x400` rendered `reliability` |
-| GPU ground truth | `nvidia-smi` | 1 % util, 95 948 / 98 304 MiB, 50.3 °C, 2.18 W, 747 MHz, `0x400` |
-| vLLM health | `GET /v1/models` | 200, `Qwen/Qwen3.8-Flash-Next`, max_model_len 409600 |
-| Idle CPU, 1500x950, Home visible, 60 s | `tools/measure.py` x3 | mean 10.43 / 9.23 / **7.65 %** — bracketing the documented 7.84 %; no regression detectable, spread is machine noise (Brave and t3 also active) |
-| RSS / process tree | `tools/measure.py` | 447.8 MiB, 7 processes |
+*Fix.* The hysteresis is still tracked, but the event is only recorded when Follow Server is on.
 
-**Untouched, verified by checksum and mtime:**
+### 3.4 Copy defects
 
-| File | Value |
-| --- | --- |
-| `RTX-Spark-AI-Control/config.json` | MD5 `7e2c65400c2011a80a373b4320f24cab` |
-| `RTX-Spark-AI-Control/runtime-state.json` | MD5 `99914b932bd37a50b983c5e7c90ae93b`, 2 bytes, mtime 21:56 |
-| `RTX-Spark-AI-Blackout/state.json` | MD5 `95a1141fdfe2ab20597bced376890fa9`, mtime 22:00 |
-| vLLM | still serving on 127.0.0.1:8000, listener pid 10644 |
-| Startup entries | no `HKCU\...\Run` value for V2 |
+"tolerated for 0 minutes" for a 20 s grace window, and a display-request row that said
+"released while idle" even when the real reason was a locked session. Both corrected
+(`span()` helper; explicit locked wording).
 
 ---
 
-## 6. Open items
-
-**Deliberately not implemented** (Phase 2, unchanged): Start / Stop / Restart, Blackout Now,
-Follow Server, autostart, process ownership. Migration order is in `README.md` §7.
-
-**Cosmetic, deliberately not touched** (no user-visible effect, and changing them would
-invalidate the measured binary):
-
-* `telemetry.rs`: `Snapshot.collect_duration_ms` is hard-coded to `0`; it is typed in
-  `src/lib/types.ts` but never rendered.
-* Dead code warnings: `telemetry::V1_ROOT` and `winproc::Listener::port` are unused.
-* History and the event ring are in-memory only; exiting loses the sparkline.
-
-**Recommended next:**
-
-1. `git init` plus an initial commit — `.gitignore` already anticipates it, and there is
-   currently no history to diff against after a stall like this one.
-2. Phase 2 step 1: process ownership (spawn vLLM from
-   `FN-Optimization/configs/final/qwen3.8-flash-next-optimized.yaml`, record the PID, refuse
-   to stop anything V2 did not start).
-3. If idle cost matters at 4K, revisit the remaining `backdrop-filter` on the rail only.
-
----
-
-## 7. How to resume from a cold start
+## 4. How to resume
 
 ```powershell
 cd C:\Users\cohen\AI\RTX-Spark-AI-Control-V2
 .\run.ps1              # existing binary; add -Build to rebuild first
 curl.exe http://127.0.0.1:8000/v1/models   # server health
+git log --oneline      # baseline + Phase 2 commits
 ```
 
-`run.ps1` builds through `npm run app:build` (the Tauri CLI). Never `cargo build` alone:
-the binary links but carries the dev URL `http://localhost:1420` and the window comes up
-black. Diagnosis path for any blank window is: check the CDP target URL first.
-
-Dev tooling, opt-in only:
+Dev tooling is opt-in only:
 
 ```powershell
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--remote-debugging-port=9222'
-python tools/cdp.py eval "document.body.innerText"     # venv python with PIL: native-vLLM\.venv
-python tools/measure.py --label x --seconds 60
+python tools\cdp.py eval "document.body.innerText"   # venv python: native-vLLM\.venv
+python tools\shots.py screenshots
+python tools\measure.py --label x --seconds 60
 ```
+
+Never `cargo build` alone: the binary links but carries the dev URL and the window comes up
+black. Diagnosis for a blank window is always "check the CDP target URL first".
+
+---
+
+## 5. Open items (next session)
+
+1. **The four unexecuted display tests.** They need an unlocked desktop:
+   automatic blackout at 180 s, input restore, `powercfg /requests` during coverage, and a
+   visible-window idle measurement. Commands are in `TEST-RESULTS.md` §6. Nothing in the code
+   needs changing first.
+2. **Responsiveness under heavy inference.** Deliberately deferred: generating load means
+   queueing real work on the production server, which needs the owner's approval
+   (`tools/infer-probe.py`).
+3. **Adoption of a bare `python -m vllm…` server** stops the listener only, not an unknown
+   parent. Documented in `README.md` §9; acceptable as designed, but worth revisiting if the
+   operator switches to module-style launches.
+4. **Optional Phase 1 leftovers, still untouched:** `Snapshot.collect_duration_ms` is hard-coded
+   to `0` (typed in `types.ts`, never rendered), and the sparkline/event history is in-memory
+   by design.
+
+---
+
+## 6. Git
+
+Repository was initialised during this work; identity is local only
+(`Cohen <cohen@localhost>`).
+
+| Commit | Content |
+| --- | --- |
+| `b73bb82` | Baseline: validated read-only V2 prototype (Tauri 2 + Rust + React, ARM64) |
+| Phase 2 code | vLLM lifecycle, blackout integration, Follow Server automation, event ring, settings persistence, branded icon, page rebuilds |
+| Phase 2 docs | `TEST-RESULTS.md`, this file, `README.md`, `FN-Optimization/PROGRESS.md` |
+
+---
+
+## 7. `stored JSON document is at capacity: runtime-state.json`
+
+That error, which stalled the earlier conversation, is **not** a defect in V1, V2 or the model
+server. It came from the agent harness's own session store
+(`HarnessStoreCapacityError`, `_MAX_DOCUMENT_BYTES` = 64 MiB) refusing a write to the session
+document `~/.vibe/logs/session/unified/<session-id>/generations/<gen>/runtime-state.json`.
+The project file with the same name, `RTX-Spark-AI-Control/runtime-state.json`, is 2 bytes
+containing `{}` (MD5 `99914b932bd37a50b983c5e7c90ae93b`) and has nothing to do with it.
+
+Nothing was deleted or rewritten to "fix" it; the response is keeping state in project files —
+this one, `TEST-RESULTS.md`, `README.md` and `FN-Optimization/PROGRESS.md`.

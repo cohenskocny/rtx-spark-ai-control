@@ -4,3 +4,5 @@ src-tauri/target/
 src-tauri/gen/
 results/
 shots/*.png
+__pycache__/
+tools/ps/
