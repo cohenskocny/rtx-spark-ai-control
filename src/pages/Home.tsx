@@ -1,10 +1,12 @@
 import type { LogEvent, Snapshot } from "../lib/types";
 import { Kpi, Card, Pill, Row, SectionHead, Sparkline, EventList } from "../components/primitives";
 import { age, context, gib, mhz, num, pct, throttleReasons, uptime, watts } from "../lib/format";
+import { actions } from "../lib/api";
+import type { RunAction } from "../lib/useAction";
 
 function stateTone(state: string | undefined): "live" | "loading" | "offline" | "idle" {
   if (state === "ready") return "live";
-  if (state === "loading") return "loading";
+  if (state === "loading" || state === "starting" || state === "stopping") return "loading";
   if (state === "error") return "offline";
   return "idle";
 }
@@ -12,7 +14,10 @@ function stateTone(state: string | undefined): "live" | "loading" | "offline" | 
 function stateLabel(state: string | undefined): string {
   if (state === "ready") return "Model ready";
   if (state === "loading") return "Loading";
+  if (state === "starting") return "Starting";
+  if (state === "stopping") return "Stopping";
   if (state === "error") return "Attention";
+  if (state === "external") return "External";
   return "Stopped";
 }
 
@@ -21,22 +26,30 @@ export function Home({
   events,
   history,
   lastAt,
+  run,
+  pending,
 }: {
   snap: Snapshot | null;
   events: LogEvent[];
   history: number[];
   lastAt: number | null;
+  run: RunAction;
+  pending: string | null;
 }) {
   const gpu = snap?.gpu;
   const model = snap?.model;
   const server = snap?.server;
   const blackout = snap?.blackout;
+  const automation = snap?.automation;
   const reasons = throttleReasons(gpu?.throttle);
 
   const vramPct =
     gpu?.mem_used_mib && gpu?.mem_total_mib
       ? (gpu.mem_used_mib / gpu.mem_total_mib) * 100
       : undefined;
+
+  const busy = pending !== null;
+  const loading = server?.state === "loading" || server?.state === "starting";
 
   return (
     <div className="stack">
@@ -52,24 +65,78 @@ export function Home({
                 {stateLabel(server?.state)}
               </Pill>
               <span className="tag">{model?.dtype ?? "—"}</span>
-              <span className="tag">
-                MTP {model?.mtp_depth ?? "—"}
-              </span>
+              <span className="tag">MTP {model?.mtp_depth ?? "—"}</span>
               <span className="tag">{context(model?.max_model_len)} ctx</span>
+              {loading ? (
+                <span className="tag">
+                  {server?.stage ?? "loading"}
+                  {server?.progress_pct != null ? ` · ${num(server.progress_pct, 0)}%` : ""}
+                </span>
+              ) : null}
             </div>
+          </div>
+
+          <div className="hero-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!server?.can_start || busy}
+              onClick={() => void run("start", actions.serverStart)}
+              title={
+                server?.can_start
+                  ? "Launch the optimized Qwen configuration"
+                  : (server?.detail ?? "A server is already using the port")
+              }
+            >
+              {pending === "start" ? "Starting…" : "Start inference"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!server?.can_stop || busy}
+              onClick={() => void run("stop", actions.serverStop)}
+              title={
+                server?.can_stop
+                  ? "Stop the server this application manages"
+                  : "Only a server started or adopted here can be stopped"
+              }
+            >
+              {pending === "stop" ? "Stopping…" : "Stop"}
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={!server?.can_restart || busy}
+              onClick={() => void run("restart", actions.serverRestart)}
+            >
+              Restart
+            </button>
+            {server?.can_adopt ? (
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={busy}
+                onClick={() => void run("adopt", actions.serverAdopt)}
+                title="Take over the server that is already running so Stop and Restart apply to it"
+              >
+                Adopt
+              </button>
+            ) : null}
           </div>
 
           <div className="hero-foot">
             <span className="endpoint">
               <span
                 className={`led ${
-                  server?.state === "ready" ? "" : server?.state === "loading" ? "warm" : "off"
+                  server?.state === "ready" ? "" : loading ? "warm" : "off"
                 }`}
               />
-              {model?.endpoint ?? "http://127.0.0.1:8000/v1"}
+              {server?.endpoint ?? "http://127.0.0.1:8000/v1"}
             </span>
             <span className="note">
-              Read-only telemetry · sampled {age(lastAt)}
+              {server?.owned ? "Managed here" : server?.listening ? "External process" : "Idle"}
+              {" · sampled "}
+              {age(lastAt)}
             </span>
           </div>
         </Card>
@@ -83,7 +150,7 @@ export function Home({
                 server?.health_ok ? (
                   <strong>{num(server.latency_ms, 0)} ms</strong>
                 ) : (
-                  <span className="dim">{server?.error ?? "no response"}</span>
+                  <span className="dim">{server?.health_error ?? "no response"}</span>
                 )
               }
             />
@@ -94,6 +161,18 @@ export function Home({
               mono
             />
             <Row k="Model id" v={server?.models?.[0] ?? model?.served_name ?? "—"} />
+            <Row
+              k="Owner"
+              v={
+                server?.owned
+                  ? server.adopted
+                    ? "adopted"
+                    : "started here"
+                  : server?.listening
+                    ? "external"
+                    : "—"
+              }
+            />
           </div>
         </Card>
       </div>
@@ -179,9 +258,14 @@ export function Home({
         </Card>
 
         <Card className="pad-lg">
-          <SectionHead title="Model" hint="from V1 configuration" />
+          <SectionHead title="Model" hint="from V1 configuration, never rewritten" />
           <div className="rows">
-            <Row k="Checkpoint" v={model?.checkpoint?.split("\\").pop() ?? "—"} mono title={model?.checkpoint} />
+            <Row
+              k="Checkpoint"
+              v={model?.checkpoint?.split("\\").pop() ?? "—"}
+              mono
+              title={model?.checkpoint}
+            />
             <Row k="Precision" v={`${model?.dtype ?? "—"} · KV ${model?.kv_cache_dtype ?? "—"}`} />
             <Row k="Context" v={`${context(model?.max_model_len)} tokens`} />
             <Row
@@ -195,20 +279,30 @@ export function Home({
 
       <div className="split-even">
         <Card className="pad-lg">
-          <SectionHead title="Blackout" hint="V1 engine, watched only" />
+          <SectionHead title="Blackout" hint={automation?.reason ?? "automatic blackout"} />
           <div className="rows">
             <Row
-              k="Engine"
+              k="State"
               v={
-                blackout?.engine_active ? (
-                  <strong>active · display held</strong>
+                blackout?.active ? (
+                  <strong>covering · display held</strong>
+                ) : blackout?.running ? (
+                  <span>armed · waiting for idle</span>
                 ) : (
-                  <span className="dim">idle</span>
+                  <span className="dim">not running</span>
                 )
               }
             />
-            <Row k="Auto timeout" v={`${blackout?.idle_seconds ?? 180} s`} />
-            <Row k="Follow server" v={blackout?.follow_server ? "on" : "off"} />
+            <Row
+              k="Automatic"
+              v={
+                automation?.enabled
+                  ? `${automation.phase}${automation.armed ? " · armed" : ""}`
+                  : "off"
+              }
+            />
+            <Row k="Timeout" v={`${snap?.settings.idle_seconds ?? 180} s`} />
+            <Row k="Follow server" v={automation?.follow_server ? "on" : "off"} />
             <Row k="Cover" v={blackout?.cover ?? "internal"} />
           </div>
         </Card>

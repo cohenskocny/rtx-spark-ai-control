@@ -194,7 +194,10 @@ export function EventList({ events, limit = 5 }: { events: LogEvent[]; limit?: n
       {slice.map((event) => (
         <div className="event" data-kind={event.kind} key={event.id}>
           <span className="t">{clockTime(event.at)}</span>
-          <span>{event.text}</span>
+          <span>
+            {event.text}
+            {event.repeat > 1 ? ` ×${event.repeat}` : ""}
+          </span>
         </div>
       ))}
     </div>

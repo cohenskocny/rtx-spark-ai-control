@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { errorText, sample } from "./api";
 import type { LogEvent, Snapshot, VisibilityEvent } from "./types";
 
-const MAX_EVENTS = 80;
+/** Newest-first, capped: the ring in Rust is bounded too, but the window can
+ *  outlive several thousand lines and the Logs page only shows so many. */
+const MAX_EVENTS = 240;
 
 export interface TelemetryState {
   snap: Snapshot | null;
@@ -13,7 +15,6 @@ export interface TelemetryState {
   pausedReason: string;
   lastAt: number | null;
   latencyMs: number | null;
-  invertedPollMs: number;
   refresh: () => void;
 }
 
@@ -25,8 +26,12 @@ function stamp(): string {
 /**
  * Serial polling with a completion-scheduled timer: the next request is queued
  * only after the previous one resolves, so a slow poll can never stack. Polling
- * stops completely when the window is minimised or hidden (unless the operator
- * turns that off), and resumes with one immediate sample.
+ * stops completely when the window is minimised or hidden, and resumes with one
+ * immediate sample.
+ *
+ * Events come from the backend ring, which is the only place that sees process
+ * lifetimes and blackout transitions. The cursor advances with what has been
+ * received, so no line is delivered twice and none are missed while hidden.
  */
 export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): TelemetryState {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -40,15 +45,21 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
   const timer = useRef<number | null>(null);
   const busy = useRef(false);
   const stopped = useRef(false);
-  const eventId = useRef(0);
+  const cursor = useRef(0);
   const hidden = useRef(false);
   const prefs = useRef({ pollMs, pauseWhenHidden });
   prefs.current = { pollMs, pauseWhenHidden };
 
-  const pushEvent = useCallback((kind: LogEvent["kind"], text: string) => {
-    eventId.current += 1;
-    const entry: LogEvent = { id: eventId.current, at: Date.now(), kind, text };
-    setEvents((prev) => [entry, ...prev].slice(0, MAX_EVENTS));
+  const mergeEvents = useCallback((incoming: LogEvent[]) => {
+    if (!incoming.length) return;
+    setEvents((prev) => {
+      const highest = incoming.reduce((max, e) => (e.id > max ? e.id : max), 0);
+      if (highest > cursor.current) cursor.current = highest;
+      // Backend order is oldest-first; the lists render newest-first.
+      const fresh = incoming.filter((e) => !prev.some((p) => p.id === e.id)).reverse();
+      if (!fresh.length) return prev;
+      return [...fresh, ...prev].slice(0, MAX_EVENTS);
+    });
   }, []);
 
   const schedule = useCallback((delay: number) => {
@@ -69,14 +80,13 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
     busy.current = true;
     const began = performance.now();
     try {
-      const next = await invoke<Snapshot>("snapshot");
+      const next = await sample(cursor.current);
       setSnap(next);
+      mergeEvents(next.events);
       setError(null);
       setLastAt(Date.now());
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      pushEvent("error", `telemetry poll failed: ${message}`);
+      setError(errorText(err));
     } finally {
       setLatencyMs(Math.round(performance.now() - began));
       busy.current = false;
@@ -86,22 +96,18 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
         schedule(prefs.current.pollMs);
       }
     }
-  }, [pushEvent, schedule]);
+  }, [mergeEvents, schedule]);
 
   // Visibility: Tauri reports minimise/restore; the DOM reports occlusion and
   // tab switches.
   useEffect(() => {
-    pushEvent("info", "telemetry loop started");
     let unlisten: (() => void) | undefined;
     void listen<VisibilityEvent>("v2://visibility", (event) => {
       const payload = event.payload;
       const next = payload.minimized || !payload.visible;
       if (next !== hidden.current) {
         hidden.current = next;
-        pushEvent("info", next ? "window hidden: polling suspended" : "window visible: polling resumed");
-        if (!next) {
-          schedule(120);
-        }
+        if (!next) schedule(120);
       }
     }).then((fn) => {
       unlisten = fn;
@@ -115,6 +121,7 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
       }
     };
     document.addEventListener("visibilitychange", onDomVisibility);
+    schedule(0);
 
     return () => {
       stopped.current = true;
@@ -131,19 +138,6 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollMs]);
 
-  // Transition events worth surfacing in the Logs page.
-  const lastState = useRef<string>("");
-  useEffect(() => {
-    if (!snap) return;
-    const state = snap.server.state;
-    if (state !== lastState.current) {
-      const kind =
-        state === "ready" ? "ok" : state === "stopped" || state === "error" ? "warn" : "info";
-      pushEvent(kind as LogEvent["kind"], `inference server: ${state}`);
-      lastState.current = state;
-    }
-  }, [snap, pushEvent]);
-
   return {
     snap,
     error,
@@ -152,7 +146,6 @@ export function useTelemetry(pollMs: number, pauseWhenHidden: boolean): Telemetr
     pausedReason,
     lastAt,
     latencyMs,
-    invertedPollMs: pollMs,
     refresh: () => void tick(),
   };
 }

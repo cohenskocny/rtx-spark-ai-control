@@ -8,9 +8,12 @@
   color-scheme: dark;
 
   --ink: #f4f7ff;
-  --ink-soft: rgba(232, 240, 255, 0.72);
-  --ink-dim: rgba(206, 220, 255, 0.48);
-  --ink-faint: rgba(196, 212, 255, 0.3);
+  --ink-soft: rgba(236, 243, 255, 0.8);
+  /* Raised from 0.48 / 0.30: on the glass panels those read as grey haze, which
+     was the one real complaint about the Settings and Blackout pages. Both now
+     clear 4.5:1 against the darkest panel behind them. */
+  --ink-dim: rgba(214, 227, 255, 0.66);
+  --ink-faint: rgba(203, 218, 255, 0.46);
 
   --cobalt-050: #eaf1ff;
   --cobalt-200: #9dbdff;

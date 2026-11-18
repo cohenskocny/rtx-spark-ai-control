@@ -52,6 +52,15 @@ export function uptime(seconds: number | null | undefined): string {
   return `${s}s`;
 }
 
+/** A duration in the shortest honest unit: 45s, 90s, 3m, 5m 30s. */
+export function span(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return "—";
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  if (s % 60 === 0) return `${s / 60}m`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 export function clockTime(ms: number | null | undefined): string {
   if (!ms) return "—";
   return new Date(ms).toLocaleTimeString("en-GB", { hour12: false });

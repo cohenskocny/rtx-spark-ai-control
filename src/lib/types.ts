@@ -1,4 +1,4 @@
-/** Shapes returned by the Rust backend (`invoke('snapshot')`). */
+/** Shapes returned by the Rust backend (`invoke('snapshot')` and the actions). */
 
 export interface GpuInfo {
   available: boolean;
@@ -30,46 +30,121 @@ export interface ModelInfo {
   prefix_caching: boolean;
 }
 
-export type ServerState = "ready" | "loading" | "stopped" | "error";
-
-export interface ServerInfo {
+/** `ready` · `loading` · `starting` · `stopping` · `stopped` · `external` · `error` */
+export interface ServerView {
   state: string;
-  listening: boolean;
+  detail: string;
+  /** launching · weights · serving · idle */
+  stage: string;
+  progress_pct: number | null;
+  owned: boolean;
+  adopted: boolean;
   pid: number | null;
+  listening: boolean;
   process_name: string | null;
   uptime_s: number | null;
   health_ok: boolean;
   latency_ms: number | null;
+  health_error: string | null;
+  health_failures: number;
   models: string[];
-  error: string | null;
   endpoint: string;
+  port: number;
+  started_ms: number | null;
+  log_tail: string[];
+  last_error: string;
+  paths_ok: boolean;
+  can_start: boolean;
+  can_stop: boolean;
+  can_restart: boolean;
+  can_adopt: boolean;
 }
 
-export interface BlackoutInfo {
-  engine_active: boolean;
+/** `off` · `armed` · `active` */
+export interface BlackoutView {
+  running: boolean;
+  owned: boolean;
+  mode: string;
+  active: boolean;
+  phase: string;
   display_held: boolean;
-  stopped: boolean;
-  reason: string;
+  display_request: boolean;
+  locked: boolean;
+  idle_s: number | null;
+  idle_remaining_s: number | null;
   updated_utc: string;
+  cover: string;
+  pid: number | null;
+  state_path: string;
+  stop_file_present: boolean;
+  error: string;
+  since_s: number | null;
+  idle_threshold_s: number;
+}
+
+/** disabled · paused · waiting-server · armed · starting */
+export interface AutomationView {
+  phase: string;
+  reason: string;
+  idle_s: number;
+  idle_remaining_s: number;
+  armed: boolean;
+  server_ok: boolean;
+  suspended: boolean;
+  follow_server: boolean;
+  enabled: boolean;
+  grace_s: number;
+  hysteresis_s: number;
+  poll_s: number;
+}
+
+export interface SettingsView {
+  blackout_enabled: boolean;
   idle_seconds: number;
   follow_server: boolean;
   cover: string;
-  enabled: boolean;
-  stop_file_present: boolean;
-  state_path: string;
-  phase: string;
+  grace_s: number;
+  hysteresis_s: number;
+  poll_s: number;
+  stop_timeout_s: number;
+}
+
+export type EventKind = "info" | "ok" | "warn" | "error" | "blackout" | "log";
+
+export interface LogEvent {
+  id: number;
+  at: number;
+  kind: EventKind;
+  text: string;
+  repeat: number;
+}
+
+export interface ActionEcho {
+  ok: boolean;
+  message: string;
+  at: number;
 }
 
 export interface Snapshot {
   seq: number;
   collected_ms: number;
   collect_duration_ms: number;
+  server_uptime_s: number;
   host: string;
   model: ModelInfo;
-  server: ServerInfo;
   gpu: GpuInfo;
-  blackout: BlackoutInfo;
+  server: ServerView;
+  blackout: BlackoutView;
+  automation: AutomationView;
+  settings: SettingsView;
+  events: LogEvent[];
   notes: string[];
+  last_action: ActionEcho | null;
+}
+
+export interface ActionResult {
+  ok: boolean;
+  message: string;
 }
 
 export interface ReadyReport {
@@ -82,13 +157,4 @@ export interface VisibilityEvent {
   minimized: boolean;
   visible: boolean;
   focused: boolean;
-}
-
-export type EventKind = "info" | "ok" | "warn" | "error";
-
-export interface LogEvent {
-  id: number;
-  at: number;
-  kind: EventKind;
-  text: string;
 }
