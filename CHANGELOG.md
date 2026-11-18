@@ -12,8 +12,9 @@ Each item names the commit it came from, so a claim can be checked with
 ## [0.1.0] — Unreleased
 
 The first version that is intended to be public. It has been built and tested on
-the machine described in [README §3](README.md#3-requirements); it has not been
-packaged or distributed.
+the machine described in [README §3](README.md#3-requirements), and a Windows
+ARM64 installer has been built and verified locally. Nothing has been published
+or distributed.
 
 ### Added
 
@@ -107,13 +108,31 @@ packaged or distributed.
 - No listening socket, no elevation, no service, no registry writes. The inference
   installation is read and launched, never modified.
 
+### Packaging
+
+- **Windows ARM64 NSIS installer** — `RTX Spark AI Control_0.1.0_arm64-setup.exe`,
+  1,543,842 bytes, per-user, no elevation. Chosen over MSI because it was already
+  the configured target and installs without administrator rights. Build,
+  checksums and the full verification matrix:
+  [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
+- **Silent install and uninstall** verified twice in a throwaway directory: the
+  uninstaller removes the program, the shortcut and the registry entry, and
+  leaves the settings directory alone. The installer touches nothing outside its
+  own directory.
+- **Documentation screenshots** reduced from 20 PNGs (65 MB) to 7 JPEGs (1.2 MB)
+  by `tools/optimize-shots.ps1`; originals stay out of the repository.
+- **Transitive licence inventory** generated from both lock files into
+  [DEPENDENCIES.md](DEPENDENCIES.md) by `tools/licence-inventory.mjs` — 300 Rust
+  crates compiled for this target plus 128 JavaScript packages, every one with a
+  permissive licence option, five MPL-2.0 and unmodified.
+- **Blackout stays an external dependency** for v0.1.0: no Python runtime and no
+  guard script are bundled. Setup completes without them.
+
 ### Not in this version
 
-- A published installer or release build, a migration path for settings between
-  published versions, and code signing.
+- A **published** release, a **signed** installer, a migration path for settings
+  between published versions, and any installer test on a second machine.
 - GitHub Actions or any continuous integration.
-- A generated third-party licence inventory for the transitive dependency graph
-  (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
 - Verification on Windows x64, on other GPU generations, or with other checkpoints.
   None of that has been run.
 - Inference performance measurement while the window is visible: it requires

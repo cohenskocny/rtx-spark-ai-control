@@ -137,17 +137,48 @@ own settings apply unchanged.
 
 ## 9. Reporting a vulnerability
 
-This repository has no published security contact yet, and inventing an address
-here would be worse than saying so. When the repository is published, report
-through a private security advisory on it; until then, contact the maintainer
-privately through whatever channel you were given the project by.
+There is no published security contact, and no address is invented here to fill
+the gap. Use the private channel that matches the state of the project:
 
-Please include the version (Server page, or
-`%TEMP%\rtx-v2-startup.json`), the Windows build, and the exact message from the
-Logs page. Do not include model weights, tokens or personal paths.
+**Once the repository is public** — use GitHub's private vulnerability reporting
+on it. On the repository page: **Security** → **Advisories** → **Report a
+vulnerability**. That opens a private advisory only the maintainers can read, and
+it is the channel to prefer. Do not open a public issue for a vulnerability, and
+do not put exploit details in a pull request.
+
+For the maintainer, the button only exists once **Settings → Code security →
+Private vulnerability reporting** is enabled on the published repository; enabling
+it is a publication prerequisite, not an afterthought.
+
+**Until then** — there is no public repository, no issue tracker and no advisory
+flow, so hand the report to the person who gave you the build. Nothing in a chat
+message is private by default; say explicitly if you want it treated as
+confidential.
+
+Please include:
+
+- the version — Server page footer, or `%TEMP%\rtx-v2-startup.json`
+- your Windows build (`winver`) and whether the machine is ARM64
+- the exact message from the Logs page, and what you did immediately before
+- for an installer concern, the SHA-256 of the file you ran
+  (`Get-FileHash <file> -Algorithm SHA256`) and whether Windows showed a
+  SmartScreen warning
+
+Do not send model weights, API tokens, licence keys or personal paths. If a
+screenshot is useful, crop out the paths first.
+
+What to expect: this is a single-maintainer project with no support contract.
+Reports are read, but no response time is promised, and there is no bounty. A
+report that cannot be reproduced on the documented hardware may be recorded
+without a fix — see §10.
 
 ## 10. Supported versions
 
 Only the current `0.1.0` line is being worked on, and it is not yet published — see
 [HANDOFF.md](HANDOFF.md). There is no long-term support commitment and no backport
 policy, because there has been no release to backport to.
+
+The v0.1.0 binaries are unsigned. A signature is not a security claim about the
+program, but its absence means there is nothing to verify against a publisher
+identity — read [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md)
+and check the SHA-256 before running anything you did not build yourself.

@@ -199,6 +199,51 @@ separate and live in the webview's `localStorage`; a storage that throws is caug
 and defaults are used, so a locked-down profile degrades to defaults rather than a
 broken window.
 
+## Installer and uninstall
+
+### Windows says "Windows protected your PC" when I run the setup
+
+The v0.1.0 installer is unsigned, so SmartScreen has no publisher identity to
+show. Compare the file's SHA-256 with
+[release/v0.1.0/SHA256SUMS.txt](release/v0.1.0/SHA256SUMS.txt) before you decide:
+
+```powershell
+Get-FileHash '.\RTX Spark AI Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
+```
+
+A matching hash means the file is the one that was built and tested here. It does
+not mean Microsoft has vetted it. If the hash does not match, do not run it.
+
+### The installer refuses to run, or nothing happens
+
+The package is ARM64 only. On x64 Windows it will not install, and there is no
+x64 build. Check with `$env:PROCESSOR_ARCHITECTURE` — `ARM64` is the supported
+value.
+
+### The silent install ignored my `/D=` directory
+
+`/D` is an NSIS convention: it must be the **last** argument and it must **not**
+be quoted. `setup.exe /S /D=C:\Tools\RTXSpark` works;
+`setup.exe "/D=C:\Tools\RTX Spark"` installs to the default
+`%LOCALAPPDATA%\RTX Spark AI Control` instead. Use a path without spaces if you
+need the override.
+
+### Where did it install, and what did it change?
+
+Per user, by default: `%LOCALAPPDATA%\RTX Spark AI Control`, one Start Menu
+shortcut, and one entry under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\RTX Spark AI Control`.
+It writes no service, no scheduled task, no autostart value and no machine-wide
+files, and it never needs administrator rights. Your settings under `%APPDATA%`
+are not created or modified by installing.
+
+### Uninstalling leaves my settings behind
+
+Deliberate. Uninstall removes the program directory, the shortcut and the
+registry entry; `%APPDATA%\com.rtxspark.aicontrol.v2\` stays so a reinstall keeps
+your configuration. Delete that folder yourself if you want it gone. Uninstalling
+never touches your vLLM installation, model files, CUDA or NVIDIA drivers.
+
 ## Development
 
 ### `npm run app:dev` dies with `EBUSY: resource busy or locked, watch ...`

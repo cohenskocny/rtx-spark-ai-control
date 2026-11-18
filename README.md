@@ -4,13 +4,14 @@ A native Windows ARM64 control center for a local **native-vLLM** inference serv
 NVIDIA RTX Spark laptop, with an OLED sleep guard that keeps the panel out of a
 powered-on black state when the machine is idle.
 
-Version **0.1.0** — built and tested, **not yet published**: there is no tag, no
-installer and no release. The window is a Tauri 2 shell around a Rust backend and a
+Version **0.1.0** — built and tested, **not yet published**: there is no tag and no
+release. A per-user Windows ARM64 installer has been built and verified on this
+machine; see [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md). The window is a Tauri 2 shell around a Rust backend and a
 React frontend; it starts, stops, restarts and supervises vLLM locally, watches GPU
 telemetry, and arms the blackout engine automatically after 180 seconds of
 inactivity.
 
-![Home](screenshots/01-home.png)
+![Home](screenshots/01-home.jpg)
 
 ---
 
@@ -71,7 +72,7 @@ This is the point of the project, so it is stated plainly:
 | Component | Version |
 | --- | --- |
 | OS | Windows 11, ARM64 (Snapdragon-class SoC with an NVIDIA RTX Spark GPU) |
-| Runtime | Microsoft Edge WebView2. A Tauri NSIS installer downloads the bootstrapper when it is missing; no installer has been built in this repository yet |
+| Runtime | Microsoft Edge WebView2, installed with Windows 11. Not bundled |
 | Inference engine | native-vLLM `0.32.0+rtx_spark.0.2.0` (upstream commit `e9412963ff`) |
 | Model | `Qwen/Qwen3.8-Flash-Next`, FP4 checkpoint, MTP 4, FP8 KV cache |
 | Build toolchain | Rust 1.98 `aarch64-pc-windows-msvc`, Node 26.13, npm 11.20 |
@@ -85,8 +86,9 @@ nothing on this list is claimed. See [INSTALL.md](INSTALL.md).
 
 - **Build from source**: [INSTALL.md](INSTALL.md#2-build-from-source). This is the
   only verified path today.
-- Per-user installer: intended, not built and not tested — packaging is the next
-  milestone.
+- **Per-user installer**: built and verified locally (NSIS, no administrator
+  rights, ARM64 only) — [release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
+  It is unsigned, and nothing has been published.
 - Connecting an existing vLLM installation: [INSTALL.md](INSTALL.md#3-connect-an-existing-native-vllm-installation).
 - Every path, the endpoint and the served model name: [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -106,13 +108,13 @@ refuses to save a half-valid set. Nothing is guessed from one person's directory
 | **Settings** | Interface and automation preferences, session facts |
 | **Logs** | Event ring, the server's own output tail, diagnostics |
 
-![Server](screenshots/02-server.png)
+![Server](screenshots/02-server.jpg)
 
-![Blackout](screenshots/03-blackout.png)
+![Blackout](screenshots/03-blackout.jpg)
 
 ### Updates
 
-![Updates](screenshots/phase3-01-updates.png)
+![Updates](screenshots/phase3-01-updates.jpg)
 
 The top half reads the installed build from the environment itself: version, project
 build, source revision, wheel tag, interpreter and the file the version came from. The
@@ -125,11 +127,16 @@ release is the baseline this application was tested against
 (`native-vLLM 0.2.0` · `vLLM 0.32.0` · `windows-arm64`). Anything else reports "unknown"
 rather than a guess.
 
-![Updates, release and commits](screenshots/phase3-02-updates-releases.png)
+![Updates, release and commits](screenshots/phase3-02-updates-releases.jpg)
 
 ### Setup
 
-![Setup](screenshots/phase3-03-setup.png)
+![Setup](screenshots/phase3-03-setup.jpg)
+
+![Setup with blackout left out](screenshots/phase3-05-setup-optional.jpg)
+
+Blackout is optional. A configuration with the two blackout paths empty saves and runs;
+the guard's controls say why they are unavailable instead of refusing the whole setup.
 
 Each location is validated as it is typed, and a field's verdict is shown next to it.
 "Find installations" searches the locations the engine and the blackout guard normally
@@ -139,7 +146,7 @@ documented keys are read and the file is never written.
 
 ### Battery
 
-![Server on battery](screenshots/phase3-04-server-battery.png)
+![Server on battery](screenshots/phase3-04-server-battery.jpg)
 
 ## 6. Battery behaviour
 
@@ -245,7 +252,7 @@ npm run app:dev     # development window: Vite + cargo, hot reload
 npm run build       # typecheck the frontend and bundle it
 npm run test:web    # frontend unit tests (node --test, no extra dependency)
 cargo test --manifest-path src-tauri\Cargo.toml
-npm run tauri build # intended per-user NSIS installer; never run here — packaging is the next milestone
+npm run tauri build # release binary + per-user NSIS installer (verified, exit 0)
 ```
 
 `npm run app:dev` used to die with an `EBUSY` error from the file watcher: Vite walked

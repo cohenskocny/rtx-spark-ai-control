@@ -165,7 +165,7 @@ unlocked run is recommended before quoting these numbers elsewhere.
 | Pre-existing processes untouched | V1's `pythonw.exe app.py` (pids 1308, 10108, parent 34060) and production vLLM (10644/26076/29148/13260/22636) survived every run |
 | Autostart | no `HKCU\…\Run` value for V2, no service, no scheduled task (registry read after the work) |
 | Logs page | server lifecycle, blackout transitions, errors, warnings with a repeat count (`×N`) for identical lines inside 5 s; 400-entry in-memory ring |
-| Screenshots | `screenshots/phase2-0{1..5}-<page>.png` plus `-b.png` for pages taller than the window, captured from the live webview at 150 % DPI |
+| Screenshots | Captured from the live webview at 150 % DPI. The tracked set is 7 JPEGs under `screenshots/` (1.2 MB), produced by `tools/optimize-shots.ps1`; the 20 original PNGs (65 MB) are archived outside the repository |
 | Icon | ICO contains 16, 24, 32, 48, 64, 128, 256 (32 bpp each); candidates in `assets/icon-candidates/` with a contact sheet |
 
 ---

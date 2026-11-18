@@ -69,17 +69,60 @@ npm run app:dev     # Vite on 127.0.0.1:1420 + cargo dev build
 inference off and on is a lifecycle action. Use the mock described in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Per-user installer (unverified)
+### Build the installer
+
+**Tested on 2026-11-18** (exit 0, native `aarch64-pc-windows-msvc`):
 
 ```powershell
 npm run tauri build
 ```
 
 `src-tauri/tauri.conf.json` asks for an NSIS target with
-`installMode: "currentUser"`, so the result would be a per-user installer in
-`src-tauri\target\release\bundle\nsis\`. **This command has not been run in this
-repository** and no installer has been tested. Treat it as the packaging
-milestone, not as a supported install path.
+`installMode: "currentUser"`. Two artifacts come out:
+
+```text
+src-tauri\target\release\rtx-spark-ai-control-v2.exe                          5,280,768 B
+src-tauri\target\release\bundle\nsis\RTX Spark AI Control_0.1.0_arm64-setup.exe  1,543,842 B
+```
+
+The NSIS toolchain is downloaded once into `%LOCALAPPDATA%\tauri\NSIS`. The
+installer is unsigned — there is no code-signing identity configured — so it will
+trigger a SmartScreen warning on other machines. Never bypass that warning for a
+download you cannot hash; verify the SHA-256 first.
+
+### Install from the packaged installer
+
+`RTX Spark AI Control_0.1.0_arm64-setup.exe` is a per-user installer. It needs no
+administrator rights, installs to `%LOCALAPPDATA%\RTX Spark AI Control`, adds one
+Start Menu shortcut and one Add/Remove Programs entry, and does nothing else.
+
+```powershell
+# interactive: double-click, or
+.\RTX Spark AI Control_0.1.0_arm64-setup.exe
+
+# silent, into a directory of your choosing (note: /D must be last and unquoted)
+.\RTX Spark AI Control_0.1.0_arm64-setup.exe /S /D=C:\Tools\RTXSpark
+```
+
+Verify the file you are about to run:
+
+```powershell
+Get-FileHash '.\RTX Spark AI Control_0.1.0_arm64-setup.exe' -Algorithm SHA256
+# 50C785282A92FED63E7F64D4C76AA3DF234A1A0474131F1D424F46F1C50DAA3F
+```
+
+The expected hashes, the installer-type rationale, the full test matrix and the
+list of what is and is not bundled are in
+[release/v0.1.0/RELEASE-MANIFEST.md](release/v0.1.0/RELEASE-MANIFEST.md).
+
+Two things worth knowing before you install:
+
+- The package is **ARM64 only**. It will not install on x64 Windows.
+- It contains **no** vLLM, no Python, no model weights and no CUDA components.
+  You still connect your own installation afterwards — see §3.
+
+If you would rather not use an installer at all, the bare executable from §2 runs
+the same application with no registration of any kind.
 
 ## 3. Connect an existing native-vLLM installation
 
@@ -141,20 +184,28 @@ defaults and stored file locations are in [CONFIGURATION.md](CONFIGURATION.md).
 ## 5. Uninstall
 
 **Tested:** stop the server from the Server page if this application started it,
-then close the window. There is no service, no scheduled task, no autostart entry
-and no registry write; closing the window stops whatever this application
-started, including the blackout guard.
+then close the window. There is no service, no scheduled task and no autostart
+entry; closing the window stops whatever this application started, including the
+blackout guard.
 
-Then delete:
+**Installed from the package** — use Add/Remove Programs, or run the uninstaller
+directly. Silent form as used for verification:
+
+```powershell
+& "$env:LOCALAPPDATA\RTX Spark AI Control\uninstall.exe" /S
+```
+
+**Tested twice on 2026-11-18:** the program directory, the Start Menu shortcut and
+the `HKCU\...\Uninstall\RTX Spark AI Control` registry entry are removed, and your
+settings directory is left alone.
+
+**Ran the bare executable** — delete the executable and, if you want a clean
+slate, the settings directory:
 
 ```text
 %APPDATA%\com.rtxspark.aicontrol.v2\      settings, runtime state, update cache
 <whichever folder you placed the exe in>  the application binary
 ```
-
-If an installer is produced in the packaging milestone, its own uninstall entry
-will remove the binary; the `%APPDATA%` folder above stays under your control
-either way.
 
 Deleting the `%APPDATA%` folder loses your configuration and the last successful
 update check. It never touches your vLLM installation, its configuration, your
@@ -165,8 +216,9 @@ model files or the guard script.
 **Tested on 2026-11-18:**
 
 ```powershell
-cargo test --manifest-path src-tauri\Cargo.toml   # 46 passed, 0 failed
-npm run test:web                                  # 20 passed, 0 failed
+cargo test --manifest-path src-tauri\Cargo.toml   # 49 passed, 0 failed
+npm run test:web                                  # 24 passed, 0 failed
 npx tsc --noEmit                                  # clean
-npm run build                                     # 51 modules
+npm run build                                     # 52 modules, 473 ms
+npm run tauri build                               # exit 0, installer produced
 ```

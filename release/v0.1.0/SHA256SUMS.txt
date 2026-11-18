@@ -1,0 +1,2 @@
+61ffb34b9fb1f239d7184fc754f379996a159d6ad2d2b8e26208f20624fb517f *rtx-spark-ai-control-v2.exe
+50c785282a92fed63e7f64d4c76aa3df234a1a0474131f1d424f46f1c50daa3f *RTX Spark AI Control_0.1.0_arm64-setup.exe

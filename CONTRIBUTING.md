@@ -134,6 +134,11 @@ Docs are part of the change, not a follow-up:
   [README §3](README.md#3-requirements) is where the honest limits live.
 - No personal paths, usernames, hostnames or tokens in docs, screenshots or
   committed output.
+- Two generated files are never hand-edited: [DEPENDENCIES.md](DEPENDENCIES.md)
+  comes from `node tools/licence-inventory.mjs` (run it after any dependency
+  change), and the JPEGs under `screenshots/` come from
+  `tools/optimize-shots.ps1 -Src <archive> -Out screenshots`. Keep the originals
+  out of the repository — they are 65 MB and Git keeps every version of them.
 
 ## 7. Where to start
 
