@@ -1,9 +1,9 @@
-//! System telemetry: GPU via nvidia-smi, plus the read-only V1 configuration.
+//! System telemetry: GPU via nvidia-smi, plus the read-only model configuration.
 //!
 //! Server liveness lives in `vllm.rs` and the blackout guard in `blackout.rs`;
 //! this module only answers "what is in the machine". Nothing here mutates the
-//! environment: no spawn of vLLM, no display power requests, no writes to V1's
-//! directory.
+//! environment: no spawn of vLLM, no display power requests, no writes to any
+//! installation.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -12,14 +12,13 @@ use std::time::Instant;
 
 use serde::Serialize;
 
+use crate::paths::Paths;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-/// Where V1 keeps its config. Read-only.
-pub const V1_CONFIG: &str = r"C:\Users\cohen\AI\RTX-Spark-AI-Control\config.json";
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct GpuInfo {
@@ -140,9 +139,66 @@ pub fn sample_gpu() -> GpuInfo {
 
 // ------------------------------------------------------------------------ config
 
-fn read_json(path: &str) -> Option<serde_json::Value> {
-    let text = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&text).ok()
+/// Build the model view from configured paths alone.
+///
+/// The YAML serve configuration is read for the numbers it declares (context
+/// length, quantisation, speculative depth); nothing here writes to it, and a
+/// missing file degrades to "unknown" rather than an error the interface cannot
+/// draw.
+pub fn read_model(config: &Paths) -> ModelInfo {
+    let checkpoint = config.model_checkpoint.trim().to_string();
+    let config_path = config.launch_config.trim().to_string();
+    let yaml = std::fs::read_to_string(&config_path).unwrap_or_default();
+    let num_of = |key: &str| -> Option<f64> { yaml_scalar(&yaml, key)?.parse::<f64>().ok() };
+
+    ModelInfo {
+        served_name: config.served_name(),
+        checkpoint_exists: !checkpoint.is_empty() && Path::new(&checkpoint).exists(),
+        checkpoint,
+        endpoint: config.endpoint(),
+        config_path,
+        chat_template: config.chat_template.trim().to_string(),
+        dtype: yaml_scalar(&yaml, "dtype").unwrap_or_else(|| "unknown".into()),
+        kv_cache_dtype: yaml_scalar(&yaml, "kv-cache-dtype").unwrap_or_else(|| "auto".into()),
+        max_model_len: num_of("max-model-len").map(|v| v as u64),
+        gpu_memory_utilization: num_of("gpu-memory-utilization"),
+        mtp_depth: yaml_all(&yaml, "num_speculative_tokens")
+            .first()
+            .and_then(|v| v.parse().ok()),
+        max_num_seqs: num_of("max-num-seqs").map(|v| v as u64),
+        prefix_caching: yaml_scalar(&yaml, "enable-prefix-caching")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false),
+    }
+}
+
+// ---------------------------------------------------------------------- sampling
+
+static SEQ: AtomicU64 = AtomicU64::new(0);
+
+pub fn collect_system() -> SystemView {
+    let began = Instant::now();
+    let config = crate::paths::current();
+    let model = read_model(&config);
+
+    let mut notes = Vec::new();
+    if config.launch_missing().len() == 4 {
+        notes.push("Installation paths are not configured yet; open Setup".to_string());
+    } else if !model.checkpoint_exists {
+        notes.push(format!("checkpoint not found at {}", model.checkpoint));
+    }
+    if !model.config_path.is_empty() && !Path::new(&model.config_path).exists() {
+        notes.push(format!("serve configuration not found at {}", model.config_path));
+    }
+
+    SystemView {
+        seq: SEQ.fetch_add(1, Ordering::Relaxed) + 1,
+        collected_ms: began.elapsed().as_millis(),
+        host: hostname(),
+        model,
+        gpu: sample_gpu(),
+        notes,
+    }
 }
 
 fn yaml_scalar(text: &str, key: &str) -> Option<String> {
@@ -167,85 +223,6 @@ fn yaml_all(text: &str, key: &str) -> Vec<String> {
                 .filter(|v| !v.is_empty())
         })
         .collect()
-}
-
-pub fn read_model(cfg: &serde_json::Value) -> ModelInfo {
-    let get = |path: &[&str]| -> String {
-        let mut cur = cfg;
-        for key in path {
-            match cur.get(*key) {
-                Some(v) => cur = v,
-                None => return String::new(),
-            }
-        }
-        cur.as_str().unwrap_or_default().to_string()
-    };
-
-    let checkpoint = get(&["server", "model_path"]);
-    let config_path = get(&["server", "config_path"]);
-    let host = get(&["server", "host"]);
-    let port = cfg
-        .get("server")
-        .and_then(|s| s.get("port"))
-        .and_then(|p| p.as_u64())
-        .unwrap_or(8000);
-
-    let yaml = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let num_of = |key: &str| -> Option<f64> { yaml_scalar(&yaml, key)?.parse::<f64>().ok() };
-
-    // The QA port override keeps the displayed endpoint honest when the
-    // lifecycle is exercised against a mock on a spare port.
-    let endpoint = match std::env::var("V2_TEST_PORT").ok().and_then(|p| p.parse::<u16>().ok()) {
-        Some(test_port) => format!("http://127.0.0.1:{test_port}/v1"),
-        None => format!("http://{host}:{port}/v1"),
-    };
-
-    ModelInfo {
-        served_name: get(&["server", "served_model"]),
-        checkpoint_exists: Path::new(&checkpoint).exists(),
-        checkpoint,
-        endpoint,
-        config_path,
-        chat_template: get(&["server", "chat_template"]),
-        dtype: yaml_scalar(&yaml, "dtype").unwrap_or_else(|| "unknown".into()),
-        kv_cache_dtype: yaml_scalar(&yaml, "kv-cache-dtype").unwrap_or_else(|| "auto".into()),
-        max_model_len: num_of("max-model-len").map(|v| v as u64),
-        gpu_memory_utilization: num_of("gpu-memory-utilization"),
-        mtp_depth: yaml_all(&yaml, "num_speculative_tokens")
-            .first()
-            .and_then(|v| v.parse().ok()),
-        max_num_seqs: num_of("max-num-seqs").map(|v| v as u64),
-        prefix_caching: yaml_scalar(&yaml, "enable-prefix-caching")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false),
-    }
-}
-
-// ---------------------------------------------------------------------- sampling
-
-static SEQ: AtomicU64 = AtomicU64::new(0);
-
-pub fn collect_system() -> SystemView {
-    let began = Instant::now();
-    let cfg = read_json(V1_CONFIG).unwrap_or(serde_json::Value::Null);
-    let model = read_model(&cfg);
-
-    let mut notes = Vec::new();
-    if !model.checkpoint_exists {
-        notes.push(format!("checkpoint not found at {}", model.checkpoint));
-    }
-    if cfg.is_null() {
-        notes.push(format!("V1 config unreadable at {V1_CONFIG}"));
-    }
-
-    SystemView {
-        seq: SEQ.fetch_add(1, Ordering::Relaxed) + 1,
-        collected_ms: began.elapsed().as_millis(),
-        host: hostname(),
-        model,
-        gpu: sample_gpu(),
-        notes,
-    }
 }
 
 fn hostname() -> String {

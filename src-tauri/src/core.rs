@@ -17,8 +17,12 @@ use serde::Serialize;
 
 use crate::blackout::BlackoutManager;
 use crate::events::{Event, EventRing};
+use crate::paths::{self, Paths};
+use crate::power::{self, PowerView};
 use crate::settings::{self, Settings};
 use crate::telemetry::{self, GpuInfo, ModelInfo};
+use crate::upstream::{self, UpstreamView};
+use crate::version::{self, Compat, Installed};
 use crate::vllm::VllmManager;
 
 pub type Shared = Arc<Mutex<Core>>;
@@ -106,13 +110,45 @@ pub struct Core {
     pub auto: Automation,
     pub last_action: Option<ActionEcho>,
     pub started: Instant,
+    /// What is installed here, read from disk rather than by importing it.
+    pub installed: Installed,
+    /// How that compares with the newest upstream release.
+    pub compat: Compat,
+    /// The last known upstream state; refreshed daily by its own thread.
+    pub upstream: UpstreamView,
+    /// Battery/AC state, sampled with the snapshot.
+    pub power: PowerView,
 }
 
 impl Core {
     pub fn new() -> Self {
         let settings = settings::load_settings();
+        paths::install(&settings.paths);
         let mut events = EventRing::new();
         events.push("info", "Control center started; telemetry and supervisors online.");
+        let power = power::sample();
+        events.push(
+            if power.on_battery() { "warn" } else { "info" },
+            match power.source.as_str() {
+                "battery" => "On battery power: automatic inference start is disabled.".to_string(),
+                "ac" => "On AC power: configured automation may start inference.".to_string(),
+                "no-battery" => "Mains power detected; no battery reported.".to_string(),
+                _ => "Power source could not be read; automatic inference start stays disabled."
+                    .to_string(),
+            },
+        );
+        let installed = version::read(&settings.paths);
+        let upstream = upstream::view_from_cache(&installed.revision);
+        let compat = version::assess(
+            &installed,
+            upstream.latest.as_ref().map(|release| release.tag.as_str()),
+        );
+        if settings.needs_setup() {
+            events.push(
+                "warn",
+                "No inference installation is configured yet; open Setup to choose one.",
+            );
+        }
         Self {
             vllm: VllmManager::load(settings.stop_timeout_s),
             blackout: BlackoutManager::new(),
@@ -121,6 +157,58 @@ impl Core {
             events,
             last_action: None,
             started: Instant::now(),
+            installed,
+            compat,
+            upstream,
+            power,
+        }
+    }
+
+    /// Re-read what is installed after the paths change, and re-angle the update
+    /// view at the new revision.
+    pub fn refresh_installed(&mut self) {
+        self.installed = version::read(&self.settings.paths);
+        self.upstream.installed_revision = self.installed.revision.clone();
+        self.compat = version::assess(
+            &self.installed,
+            self.upstream.latest.as_ref().map(|release| release.tag.as_str()),
+        );
+    }
+
+    /// Store the configured paths and make them the ones the backend reads.
+    pub fn apply_paths(&mut self, next: Paths) {
+        self.settings.paths = next;
+        self.settings = self.settings.clone().clamped();
+        paths::install(&self.settings.paths);
+        self.persist_settings();
+        self.refresh_installed();
+    }
+
+    /// Adopt the result of an update check.
+    pub fn apply_upstream(&mut self, view: UpstreamView) {
+        let latest = view.latest.as_ref().map(|release| release.tag.clone());
+        let previous = self.upstream.latest.as_ref().map(|release| release.tag.clone());
+        let was_ahead = self.upstream.commits_ahead;
+        self.compat = version::assess(&self.installed, latest.as_deref());
+        self.upstream = view;
+
+        if latest != previous {
+            match &self.upstream.latest {
+                Some(release) => self.note(
+                    "info",
+                    format!(
+                        "Upstream {} is the newest release; installed {} — {}",
+                        release.tag, self.installed.version, self.compat.message
+                    ),
+                ),
+                None => self.note("warn", "No upstream release could be read."),
+            }
+        }
+        if self.upstream.commits_ahead && !was_ahead {
+            self.note(
+                "info",
+                "Upstream has commits newer than the installed source revision (no new release).",
+            );
         }
     }
 
@@ -172,6 +260,9 @@ impl Core {
         let blackout = self.blackout.view(&self.settings);
         let automation = self.automation_view();
         let events = self.events.since(last_event_id);
+        // One synchronous call into the kernel: cheap enough for every sample, and
+        // it is what decides whether the interface offers Start at all.
+        self.power = power::sample();
         let mut snapshot = Snapshot {
             seq: system.seq,
             collected_ms: system.collected_ms,
@@ -184,6 +275,11 @@ impl Core {
             blackout,
             automation,
             settings: SettingsView::from(&self.settings),
+            config: ConfigView::from(&self.settings.paths),
+            power: self.power.clone(),
+            installed: self.installed.clone(),
+            compat: self.compat.clone(),
+            upstream: self.upstream.clone(),
             events,
             notes: system.notes,
             last_action: self.last_action.clone(),
@@ -226,10 +322,82 @@ pub struct Snapshot {
     pub blackout: crate::blackout::BlackoutView,
     pub automation: AutomationView,
     pub settings: SettingsView,
+    pub config: ConfigView,
+    pub power: PowerView,
+    pub installed: Installed,
+    pub compat: Compat,
+    pub upstream: UpstreamView,
     pub events: Vec<Event>,
     pub notes: Vec<String>,
     pub last_action: Option<ActionEcho>,
     pub server_uptime_s: u128,
+}
+
+/// One configured path, with the verdict the Setup page shows beside it.
+#[derive(Serialize, Clone, Debug)]
+pub struct FieldView {
+    pub field: String,
+    pub kind: String,
+    pub value: String,
+    pub ok: bool,
+    pub message: String,
+}
+
+/// The portable configuration, pre-validated so the interface never has to guess.
+#[derive(Serialize, Clone, Debug)]
+pub struct ConfigView {
+    pub paths: Paths,
+    pub fields: Vec<FieldView>,
+    pub api_host: String,
+    pub api_port: u16,
+    pub endpoint: String,
+    pub launch_ready: bool,
+    pub blackout_ready: bool,
+    pub needs_setup: bool,
+    pub missing_launch: Vec<String>,
+    pub missing_blackout: Vec<String>,
+}
+
+impl From<&Paths> for ConfigView {
+    fn from(paths: &Paths) -> Self {
+        let fields = paths::FIELDS
+            .iter()
+            .map(|(field, kind)| {
+                let value = paths.field(field).to_string();
+                let verdict = paths::check(&value, *kind);
+                let (ok, message) = match (&value, verdict) {
+                    (_, Ok(_)) => (true, String::new()),
+                    (text, Err(_message)) if text.trim().is_empty() && kind.optional() => {
+                        (true, "not set (optional)".to_string())
+                    }
+                    (_, Err(message)) => (false, message),
+                };
+                FieldView {
+                    field: field.to_string(),
+                    kind: format!("{kind:?}").to_lowercase(),
+                    value,
+                    ok,
+                    message,
+                }
+            })
+            .collect();
+        Self {
+            paths: paths.clone(),
+            fields,
+            api_host: paths.host(),
+            api_port: paths.port(),
+            endpoint: paths.endpoint(),
+            launch_ready: paths.launch_ready(),
+            blackout_ready: paths.blackout_ready(),
+            needs_setup: paths.launch_missing().len() == 4,
+            missing_launch: paths.launch_missing().iter().map(|s| s.to_string()).collect(),
+            missing_blackout: paths
+                .blackout_missing()
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -258,6 +426,7 @@ pub struct SettingsView {
     pub hysteresis_s: u64,
     pub poll_s: u64,
     pub stop_timeout_s: u64,
+    pub autostart_inference: bool,
 }
 
 impl From<&Settings> for SettingsView {
@@ -271,6 +440,7 @@ impl From<&Settings> for SettingsView {
             hysteresis_s: settings.hysteresis_s,
             poll_s: settings.poll_s,
             stop_timeout_s: settings.stop_timeout_s,
+            autostart_inference: settings.autostart_inference,
         }
     }
 }

@@ -90,27 +90,19 @@ impl BlackoutManager {
 
     // --------------------------------------------------------------- locations
 
-    fn v1_blackout() -> serde_json::Value {
-        let text = std::fs::read_to_string(crate::telemetry::V1_CONFIG).unwrap_or_default();
-        let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
-        value.get("blackout").cloned().unwrap_or_default()
-    }
-
+    /// The interpreter that runs the engine: the configured blackout interpreter,
+    /// or the inference environment's own Python when only that is set.
     fn python_path() -> String {
-        Self::v1_blackout()
-            .get("python")
-            .and_then(|v| v.as_str())
-            .unwrap_or(r"C:\Users\cohen\AI\native-vLLM\.venv\Scripts\pythonw.exe")
-            .to_string()
+        let config = crate::paths::current();
+        let python = config.blackout_python.trim();
+        if !python.is_empty() {
+            return python.to_string();
+        }
+        config.python_exe.trim().to_string()
     }
 
     fn script_path() -> PathBuf {
-        let script = Self::v1_blackout()
-            .get("script")
-            .and_then(|v| v.as_str())
-            .unwrap_or(r"C:\Users\cohen\AI\RTX-Spark-AI-Blackout\blackout.py")
-            .to_string();
-        PathBuf::from(script)
+        PathBuf::from(crate::paths::current().blackout_engine.trim())
     }
 
     fn state_path() -> PathBuf {

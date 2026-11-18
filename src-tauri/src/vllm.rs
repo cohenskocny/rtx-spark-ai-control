@@ -21,8 +21,9 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use crate::core::ActionResult;
+use crate::paths;
+use crate::power::{self, LaunchIntent};
 use crate::settings::{self, OwnedServer, RuntimeState};
-use crate::telemetry::V1_CONFIG;
 use crate::winproc;
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -147,36 +148,16 @@ impl VllmManager {
 
     // ------------------------------------------------------------------- config
 
-    fn v1_config() -> serde_json::Value {
-        std::fs::read_to_string(V1_CONFIG)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or(serde_json::Value::Null)
-    }
-
+    /// The inference API port, from configuration.
     pub fn port() -> u16 {
-        if let Ok(raw) = std::env::var("V2_TEST_PORT") {
-            if let Ok(port) = raw.parse::<u16>() {
-                return port;
-            }
-        }
-        Self::v1_config()
-            .get("server")
-            .and_then(|s| s.get("port"))
-            .and_then(|p| p.as_u64())
-            .unwrap_or(8000) as u16
+        paths::current().port()
     }
 
-    fn cfg_str(value: &serde_json::Value, key: &str) -> String {
-        value
-            .get("server")
-            .and_then(|s| s.get(key))
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string()
-    }
-
-    /// The command V1 launches, so both controllers start the same server.
+    /// The command to launch, built from configured paths only.
+    ///
+    /// Every element becomes one argv entry for `Command`, so a path containing a
+    /// space, a quote or an ampersand stays a path. Nothing here is ever joined
+    /// into a command line string for a shell to split.
     pub fn launch_spec() -> Result<LaunchSpec, String> {
         let port = Self::port();
         if let Ok(exe) = std::env::var("V2_TEST_VLLM_EXE") {
@@ -202,18 +183,23 @@ impl VllmManager {
             });
         }
 
-        let cfg = Self::v1_config();
-        let exe = Self::cfg_str(&cfg, "vllm_exe");
-        let model = Self::cfg_str(&cfg, "model_path");
-        let config_path = Self::cfg_str(&cfg, "config_path");
-        let template = Self::cfg_str(&cfg, "chat_template");
+        let config = paths::current();
+        let exe = config.vllm_exe.trim().to_string();
+        let model = config.model_checkpoint.trim().to_string();
+        let config_path = config.launch_config.trim().to_string();
+        let template = config.chat_template.trim().to_string();
         for (label, path) in [
             ("vllm.exe", &exe),
             ("model checkpoint", &model),
             ("vLLM config", &config_path),
             ("chat template", &template),
         ] {
-            if path.is_empty() || !Path::new(path).exists() {
+            if path.is_empty() {
+                return Err(format!(
+                    "{label} missing: set it on the Setup page before starting inference"
+                ));
+            }
+            if !Path::new(path).exists() {
                 return Err(format!("{label} missing: {path}"));
             }
         }
@@ -265,7 +251,17 @@ impl VllmManager {
 
     // ------------------------------------------------------------------- spawn
 
-    pub fn start(&mut self, events: &mut crate::events::EventRing) -> ActionResult {
+    pub fn start(
+        &mut self,
+        intent: LaunchIntent,
+        events: &mut crate::events::EventRing,
+    ) -> ActionResult {
+        // Power before anything else. A refusal here leaves the state untouched: the
+        // server is not "failed", it was never allowed to start.
+        if let Err(block) = power::gate(intent) {
+            events.push("warn", block.message.clone());
+            return ActionResult::fail(block.message);
+        }
         let discovery = self.discover();
         if discovery.listener_pid.is_some() {
             events.push(

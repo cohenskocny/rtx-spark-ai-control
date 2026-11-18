@@ -1,25 +1,33 @@
 //! RTX Spark AI Control V2 — local inference control center.
 //!
-//! Three responsibilities, kept apart on purpose:
+//! Four responsibilities, kept apart on purpose:
 //!   * `telemetry.rs` reads what is in the machine (GPU, model configuration);
 //!   * `vllm.rs` owns the inference server's lifecycle, and only touches
 //!     processes whose identity it recorded;
-//!   * `blackout.rs` arms and disarms the validated blackout engine.
+//!   * `blackout.rs` arms and disarms the validated blackout engine;
+//!   * `upstream.rs` reads the upstream project's releases — information only,
+//!     it never downloads or installs anything.
 //!
-//! `supervisor.rs` decides when the blackout guard should exist, and
+//! `paths.rs` holds the installation locations the operator configured,
+//! `power.rs` decides whether inference may start at all, `version.rs` reads what
+//! is installed, `supervisor.rs` decides when the blackout guard should exist, and
 //! `core.rs` holds the shared state every command and the interface read.
 //!
-//! V1 (`C:\Users\cohen\AI\RTX-Spark-AI-Control`) keeps its `config.json`
-//! untouched: it is read for paths and defaults, never written.
+//! Nothing here requires a particular directory layout, and nothing outside this
+//! application's own data directory is ever written.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod blackout;
 mod core;
 mod events;
+mod paths;
+mod power;
 mod settings;
 mod supervisor;
 mod telemetry;
+mod upstream;
+mod version;
 mod vllm;
 mod winproc;
 
@@ -30,6 +38,9 @@ use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager};
 
 use crate::core::{ActionResult, Core, Shared, Snapshot};
+use crate::paths::Paths;
+use crate::power::LaunchIntent;
+use crate::upstream::UpstreamView;
 use crate::vllm::StopPlan;
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
@@ -90,11 +101,16 @@ fn frontend_ready() -> ReadyReport {
 // --------------------------------------------------------------- server control
 
 #[tauri::command]
-async fn server_start() -> Result<ActionResult, String> {
+async fn server_start(confirm_battery: Option<bool>) -> Result<ActionResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let intent = if confirm_battery.unwrap_or(false) {
+            LaunchIntent::ManualConfirmed
+        } else {
+            LaunchIntent::Manual
+        };
         let shared = shared()?;
         let mut core = lock(&shared);
-        let result = core.with_vllm(|vllm, events| vllm.start(events));
+        let result = core.with_vllm(|vllm, events| vllm.start(intent, events));
         core.record_action(&result);
         drop(core);
         supervisor::request_probe();
@@ -149,8 +165,13 @@ async fn server_stop() -> Result<ActionResult, String> {
 }
 
 #[tauri::command]
-async fn server_restart() -> Result<ActionResult, String> {
+async fn server_restart(confirm_battery: Option<bool>) -> Result<ActionResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let intent = if confirm_battery.unwrap_or(false) {
+            LaunchIntent::ManualConfirmed
+        } else {
+            LaunchIntent::Manual
+        };
         let shared = shared()?;
         let stopped = do_stop(&shared);
         if !stopped.ok {
@@ -159,7 +180,7 @@ async fn server_restart() -> Result<ActionResult, String> {
         // A listener that has just closed still holds the port for a moment.
         std::thread::sleep(Duration::from_millis(600));
         let mut core = lock(&shared);
-        let result = core.with_vllm(|vllm, events| vllm.start(events));
+        let result = core.with_vllm(|vllm, events| vllm.start(intent, events));
         core.record_action(&result);
         drop(core);
         supervisor::request_probe();
@@ -377,6 +398,258 @@ async fn telemetry_interval(seconds: u64) -> Result<ActionResult, String> {
     .map_err(|error| error.to_string())?
 }
 
+// ------------------------------------------------------- portable configuration
+
+#[derive(serde::Serialize)]
+struct Validation {
+    ok: bool,
+    message: String,
+}
+
+/// Look for existing installations. Read-only, bounded, and it never applies
+/// anything: the operator gets a list to choose from.
+#[tauri::command]
+async fn config_detect() -> Result<Vec<paths::Candidate>, String> {
+    tauri::async_runtime::spawn_blocking(paths::discover)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Validate one field as it is typed, so the Setup page can answer immediately.
+#[tauri::command]
+fn config_validate(field: String, value: String) -> Validation {
+    match Paths::kind_of(&field) {
+        None => Validation {
+            ok: false,
+            message: "unknown field".to_string(),
+        },
+        Some(kind) => match paths::check(&value, kind) {
+            Ok(_) => Validation {
+                ok: true,
+                message: String::new(),
+            },
+            Err(message) if message.is_empty() => Validation {
+                ok: true,
+                message: "not set (optional)".to_string(),
+            },
+            Err(message) => Validation {
+                ok: false,
+                message,
+            },
+        },
+    }
+}
+
+/// Save the configuration. Every field is validated first and the whole save is
+/// refused if any of them is wrong, so a half-valid configuration can never be
+/// persisted and then acted on.
+#[tauri::command]
+async fn config_set(next: Paths) -> Result<ActionResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let shared = shared()?;
+        let mut failures = Vec::new();
+        for (field, kind) in paths::FIELDS {
+            let value = next.field(field);
+            if let Err(message) = paths::check(value, *kind) {
+                if !message.is_empty() {
+                    failures.push(format!("{field}: {message}"));
+                }
+            }
+        }
+        if !failures.is_empty() {
+            let result = ActionResult::fail(format!("Not saved. {}", failures.join("; ")));
+            lock(&shared).record_action(&result);
+            return Ok::<ActionResult, String>(result);
+        }
+
+        let mut core = lock(&shared);
+        core.apply_paths(next);
+        let config = core.settings.paths.clone();
+        let ready = config.launch_ready();
+        core.note(
+            if ready { "ok" } else { "warn" },
+            if ready {
+                format!("Installation configured for {}.", config.served_name())
+            } else {
+                "Configuration saved, but the launch paths are still incomplete.".to_string()
+            },
+        );
+        let result = ActionResult::ok(if ready {
+            "Configuration saved"
+        } else {
+            "Configuration saved; some paths still need attention"
+        });
+        core.record_action(&result);
+        Ok::<ActionResult, String>(result)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Import paths from a V1-shaped `config.json`, then save them like typed input.
+#[tauri::command]
+async fn config_import(legacy_path: String) -> Result<ActionResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let shared = shared()?;
+        if let Err(message) = paths::check(&legacy_path, paths::Kind::File) {
+            let result = ActionResult::fail(format!("Not imported: legacy config {message}"));
+            lock(&shared).record_action(&result);
+            return Ok::<ActionResult, String>(result);
+        }
+        match paths::import_legacy(std::path::Path::new(&legacy_path)) {
+            Ok(imported) => {
+                let mut core = lock(&shared);
+                core.apply_paths(imported);
+                let ready = core.settings.paths.launch_ready();
+                core.note(
+                    "info",
+                    format!(
+                        "Imported paths from {legacy_path}{}.",
+                        if ready { "" } else { " (launch paths incomplete)" }
+                    ),
+                );
+                let result = ActionResult::ok("Paths imported from the legacy configuration");
+                core.record_action(&result);
+                Ok::<ActionResult, String>(result)
+            }
+            Err(message) => {
+                let result = ActionResult::fail(format!("Not imported: {message}"));
+                lock(&shared).record_action(&result);
+                Ok::<ActionResult, String>(result)
+            }
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Whether inference starts with the application. Refused on battery by the
+/// launch gate rather than by this flag, which is only intent.
+#[tauri::command]
+async fn autostart_set(enabled: bool) -> Result<ActionResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let shared = shared()?;
+        let mut core = lock(&shared);
+        core.settings.autostart_inference = enabled;
+        core.persist_settings();
+        let on_battery = core.power.on_battery();
+        let suffix = if enabled && on_battery {
+            " On battery it will not run; plug in for it to take effect."
+        } else {
+            ""
+        };
+        core.note(
+            "info",
+            format!(
+                "Start inference with the application: {}.{suffix}",
+                if enabled { "on" } else { "off" }
+            ),
+        );
+        let result = ActionResult::ok(format!(
+            "Autostart {}{suffix}",
+            if enabled { "on" } else { "off" }
+        ));
+        core.record_action(&result);
+        Ok::<ActionResult, String>(result)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+// ------------------------------------------------------------ upstream releases
+
+/// Ask GitHub for the upstream release list. `force` is the manual button; without
+/// it the once-a-day window applies and the cached result is returned.
+#[tauri::command]
+async fn upstream_check(force: Option<bool>) -> Result<UpstreamView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let revision = {
+            let shared = shared()?;
+            let core = lock(&shared);
+            core.installed.revision.clone()
+        };
+        // Blocking network work happens with no lock held.
+        let view = upstream::check(force.unwrap_or(false), &revision);
+        let shared = shared()?;
+        let mut core = lock(&shared);
+        core.apply_upstream(view.clone());
+        Ok::<UpstreamView, String>(view)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Open a link in the default browser.
+///
+/// Restricted to the upstream project on github.com: a command that opens whatever
+/// it is handed is a way to launch anything on the machine.
+#[tauri::command]
+fn open_external(url: String) -> Validation {
+    if !url_allowed(&url) {
+        return Validation {
+            ok: false,
+            message: "only links to the upstream project on github.com can be opened".to_string(),
+        };
+    }
+    match open_url(&url) {
+        true => Validation {
+            ok: true,
+            message: String::new(),
+        },
+        false => Validation {
+            ok: false,
+            message: "the system could not open a browser".to_string(),
+        },
+    }
+}
+
+/// `https://github.com/devjeonghwan/vllm-for-rtx-spark[/...]` and nothing else.
+fn url_allowed(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    if rest.contains(char::is_whitespace) || rest.contains(['"', '\\', '\'']) {
+        return false;
+    }
+    let Some((host, path)) = rest.split_once('/') else {
+        return false;
+    };
+    if !host.eq_ignore_ascii_case("github.com") {
+        return false;
+    }
+    let path = format!("/{path}").to_lowercase();
+    if path.split('/').any(|segment| segment == "..") {
+        return false;
+    }
+    path == "/devjeonghwan/vllm-for-rtx-spark"
+        || path.starts_with("/devjeonghwan/vllm-for-rtx-spark/")
+}
+
+#[cfg(windows)]
+fn open_url(url: &str) -> bool {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let verb: Vec<u16> = "open\0".encode_utf16().collect();
+    let target: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let result = ShellExecuteW(
+            std::ptr::null_mut(),
+            verb.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        );
+        !result.is_null() && result as isize > 32
+    }
+}
+
+#[cfg(not(windows))]
+fn open_url(_url: &str) -> bool {
+    false
+}
+
 // --------------------------------------------------------------- window plumbing
 
 fn emit_visibility(handle: &tauri::AppHandle, minimized: bool, visible: bool, focused: bool) {
@@ -459,6 +732,46 @@ fn focus_existing() {
     }
 }
 
+/// The only automatic path that can start inference: an operator's saved
+/// preference, applied once at launch, and only if power allows it.
+///
+/// The power gate is inside `vllm.start`, so this cannot bypass it even if the
+/// preference says yes: on battery the request is refused and the reason is logged
+/// where the operator will see it.
+fn maybe_autostart(shared: Shared) {
+    std::thread::spawn(move || {
+        // Let the window paint first; a cold model load must not delay startup.
+        std::thread::sleep(Duration::from_millis(1500));
+        let wanted = {
+            let Ok(mut core) = shared.lock() else {
+                return;
+            };
+            if SHUTDOWN.load(Ordering::Relaxed) {
+                return;
+            }
+            let wanted = core.settings.autostart_inference;
+            if wanted {
+                core.note(
+                    "info",
+                    "Autostart is on; checking the power source before starting inference.",
+                );
+            }
+            wanted
+        };
+        if !wanted {
+            return;
+        }
+        let mut core = match shared.lock() {
+            Ok(core) => core,
+            Err(_) => return,
+        };
+        let result = core.with_vllm(|vllm, events| vllm.start(LaunchIntent::Automatic, events));
+        core.record_action(&result);
+        drop(core);
+        supervisor::request_probe();
+    });
+}
+
 fn main() {
     #[cfg(windows)]
     if !claim_single_instance() {
@@ -486,6 +799,13 @@ fn main() {
             blackout_cover,
             follow_server,
             telemetry_interval,
+            config_detect,
+            config_validate,
+            config_set,
+            config_import,
+            autostart_set,
+            upstream_check,
+            open_external,
         ])
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -493,6 +813,10 @@ fn main() {
             }
             watch_visibility(app.handle().clone());
             supervisor::spawn(supervisor_shared.clone());
+            // The daily update check runs on its own thread so a slow or absent
+            // network can never delay a window.
+            upstream::spawn(supervisor_shared.clone());
+            maybe_autostart(supervisor_shared.clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -520,4 +844,43 @@ fn main() {
             }
             _ => {}
         });
+}
+
+// ------------------------------------------------------------------- unit tests
+
+#[cfg(test)]
+mod tests {
+    use super::url_allowed;
+
+    #[test]
+    fn the_upstream_project_and_its_subpages_are_allowed() {
+        for url in [
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark/releases",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark/releases/tag/v0.2.0",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark/commit/8b8a427a40",
+            "https://GitHub.com/devjeonghwan/vllm-for-rtx-spark",
+        ] {
+            assert!(url_allowed(url), "{url} should be allowed");
+        }
+    }
+
+    #[test]
+    fn anything_that_is_not_the_upstream_project_is_refused() {
+        for url in [
+            "http://github.com/devjeonghwan/vllm-for-rtx-spark",
+            "https://github.com/someone/else",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark-evil",
+            "https://evil.example/devjeonghwan/vllm-for-rtx-spark",
+            "https://github.com.evil.example/devjeonghwan/vllm-for-rtx-spark",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark/../../etc",
+            "file:///C:/Windows/System32/calc.exe",
+            "https://github.com/devjeonghwan/vllm-for-rtx-spark/releases\" onmouseover=x",
+            "javascript:alert(1)",
+            "https://api.github.com/repos/devjeonghwan/vllm-for-rtx-spark",
+            "",
+        ] {
+            assert!(!url_allowed(url), "{url} should be refused");
+        }
+    }
 }
