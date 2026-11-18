@@ -18,24 +18,26 @@ Phase 3 not started. See `RECOVERY-STATUS.md` for the recovery history and
   `state.json` checks; settings persistence; GPU telemetry cross-checked vs `nvidia-smi`;
   single-instance check; V1 files and production server untouched.
 - QA tooling: `tools/qa-lifecycle.py`, `tools/mock-vllm.py`, `tools/cdp.py`,
+  `tools/qa-input.py` (SendInput injection + `GetLastInputInfo` idle reads),
   `tools/shots.py`, `tools/make-icon.py`. (Other qa-* scripts from earlier sessions
   were transient and were not preserved; their evidence lives in TEST-RESULTS.md.)
 - Docs: README (user-facing, verified claims), RECOVERY-STATUS.md, TEST-RESULTS.md,
-  screenshots/ (baseline + phase2 sets).
+  screenshots/ (baseline + phase2 sets), qa-screenshots/ (display/idle test evidence).
 
-## Remaining / NOT TESTED (run on an unlocked desktop)
-1. Automatic blackout at the real 180 s idle (`python tools\qa-blackout.py` with 9222 CDP up).
-2. Input restore after un-arming (the `blocked=False, reason=disarmed` check).
-3. No Modern Standby entry during blackout coverage (`powercfg /requests` as admin).
-4. Visible-window idle responsiveness; heavy-load check needs approval (queues work on the
-   production server, pid 10644 — do not disrupt it).
-5. Optional: a second `cargo test` while `target/` is warm.
+## Remaining / NOT TESTED
+1. Heavy-load responsiveness check — needs the owner's approval (queues real work on the
+   production server, pid 10644 — do not disrupt it). `python tools\infer-probe.py ...`
+2. Optional: a second `cargo test` while `target/` is warm.
 
-Commands for all of these: `RECOVERY-STATUS.md` §8 and `TEST-RESULTS.md` §6.
+Closed 2026-11-18 (unlocked desktop, TEST-RESULTS.md §3b): automatic blackout at idle
+(fired at a 45 s threshold), input restore via injected SendInput, standby protection
+(`ES_DISPLAY_REQUIRED`/`PowerRequestDisplayRequired` held; note: this machine has only
+S0 Low Power Idle — "no Modern Standby" was the wrong check), visible-window idle behaviour.
 
 ## Key decisions
 - Only verified capabilities are advertised in UI/docs.
-- Blackout engine stands down while the Windows session is locked — cause of items 1–3 above.
+- Blackout engine stands down while the Windows session is locked (OLED protection) —
+  verified behaviour, relevant when running idle tests.
 - Build with `npm run app:build` (bare `cargo build` ships the dev URL → black window;
   if blank, check the CDP target URL first).
 - Runtime state is kept in project files, not the harness session document (the earlier
