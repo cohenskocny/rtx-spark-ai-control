@@ -1,0 +1,27 @@
+{
+  "schema": 2,
+  "autostart_inference": false,
+  "blackout_enabled": false,
+  "cover": "internal",
+  "follow_server": false,
+  "grace_s": 300,
+  "hysteresis_s": 60,
+  "idle_seconds": 180,
+  "poll_s": 15,
+  "stop_timeout_s": 45,
+  "paths": {
+    "vllm_root": "C:\\path\\to\\native-vLLM",
+    "vllm_exe": "C:\\path\\to\\native-vLLM\\.venv\\Scripts\\vllm.exe",
+    "python_exe": "C:\\path\\to\\native-vLLM\\.venv\\Scripts\\python.exe",
+    "model_checkpoint": "D:\\models\\your-checkpoint",
+    "launch_config": "C:\\path\\to\\configs\\serve.yaml",
+    "chat_template": "C:\\path\\to\\configs\\chat-template.jinja",
+    "blackout_engine": "",
+    "blackout_python": "",
+    "logs_dir": "",
+    "api_host": "127.0.0.1",
+    "api_port": 8000,
+    "served_model": "your-org/your-model",
+    "legacy_config": ""
+  }
+}

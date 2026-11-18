@@ -226,6 +226,37 @@ mod tests {
     }
 
     #[test]
+    fn the_shipped_example_configuration_matches_this_schema() {
+        // The example is documentation a reader copies into place. Serde ignores
+        // unknown fields, so a typo in it would load silently and quietly drop a
+        // setting. Re-serialising and comparing key sets is what catches that.
+        let raw = include_str!("../../CONFIGURATION.example.json");
+        let parsed = serde_json::from_str::<Settings>(raw)
+            .expect("example parses")
+            .clamped();
+        let expected: serde_json::Value = serde_json::from_str(raw).unwrap();
+        let produced = serde_json::to_value(&parsed).unwrap();
+
+        fn keys(value: &serde_json::Value, prefix: &str) -> Vec<String> {
+            let mut out = Vec::new();
+            if let Some(map) = value.as_object() {
+                for (k, v) in map {
+                    out.push(format!("{prefix}{k}"));
+                    if v.is_object() {
+                        out.extend(keys(v, &format!("{prefix}{k}.")));
+                    }
+                }
+            }
+            out.sort();
+            out
+        }
+
+        assert_eq!(keys(&expected, ""), keys(&produced, ""));
+        assert!(!parsed.needs_setup(), "the example supplies the server paths");
+        assert_eq!(parsed.paths.endpoint(), "http://127.0.0.1:8000/v1");
+    }
+
+    #[test]
     fn a_settings_file_from_before_paths_existed_still_loads() {
         with_data_dir("legacy", |dir| {
             std::fs::write(

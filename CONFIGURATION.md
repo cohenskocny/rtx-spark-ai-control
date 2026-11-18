@@ -37,6 +37,13 @@ executed is replaced with the default. A settings file written by an older build
 keeps its known keys, because the whole struct deserialises with
 `#[serde(default)]`.
 
+A complete, loadable example of the file appears in
+[CONFIGURATION.example.json](CONFIGURATION.example.json). It uses placeholder
+paths; copy it to `%APPDATA%\com.rtxspark.aicontrol.v2\settings.json` and edit
+them, or simply let Setup write the file for you. A test in `settings.rs` parses
+that example and compares its key set against the struct, so it cannot drift out
+of date unnoticed.
+
 ## 2. `paths`
 
 Every path field is validated by kind, both when it is typed and again before the
