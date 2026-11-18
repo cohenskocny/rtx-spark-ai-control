@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "app:build": "tauri build --no-bundle",
+    "release:build": "node tools/build-release.mjs",
     "app:dev": "tauri dev",
     "test:web": "node --test tests/web/"
   },
