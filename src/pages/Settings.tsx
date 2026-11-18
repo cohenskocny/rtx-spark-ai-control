@@ -116,6 +116,28 @@ export function Settings({
       <div className="split-even">
         <Card className="pad-lg">
           <SectionHead title="Automation" hint="persisted · edit on the Blackout page" />
+          <div className="setting">
+            <div className="text">
+              <span className="name">Start inference with the window</span>
+              <span className="help">
+                Off by default. When on, the window asks the backend to launch the server once at
+                startup — except on battery, where the launch gate refuses regardless of this
+                switch.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="switch"
+              data-on={settings?.autostart_inference ?? false}
+              aria-label="Start inference with the window"
+              disabled={busy}
+              onClick={() =>
+                void run("autostart", () =>
+                  actions.autostartSet(!(settings?.autostart_inference ?? false)),
+                )
+              }
+            />
+          </div>
           <div className="rows">
             <Row
               k="Automatic blackout"
@@ -137,7 +159,7 @@ export function Settings({
         </Card>
 
         <Card className="pad-lg">
-          <SectionHead title="Inference configuration" hint="read from V1, never rewritten" />
+          <SectionHead title="Inference configuration" hint="selected on the Setup page" />
           <div className="rows">
             <Row k="Model" v={model?.served_name ?? "—"} mono />
             <Row k="Endpoint" v={model?.endpoint ?? "—"} mono />
@@ -161,6 +183,9 @@ export function Settings({
             <Row k="Samples" v={snap ? String(snap.seq) : "0"} />
             <Row k="Backend uptime" v={snap ? `${Math.round(snap.server_uptime_s / 1000)} s` : "—"} />
             <Row k="Startup" v={ready ? `${ready.startup_ms} ms to first paint` : "—"} />
+            <Row k="Power" v={snap?.power.detail ?? "—"} />
+            <Row k="Inference engine" v={snap?.installed.version || "not detected"} mono />
+            <Row k="Compatibility" v={snap?.compat.status ?? "—"} />
           </div>
         </Card>
 
@@ -181,11 +206,11 @@ export function Settings({
 
       <Card quiet className="pad">
         <div className="note">
-          Configuration comes from{" "}
-          <span className="mono">C:\Users\cohen\AI\RTX-Spark-AI-Control\config.json</span> and the
-          blackout engine&apos;s <span className="mono">state.json</span>. Interface preferences
-          above live in this window&apos;s local storage; the automation values live in the
-          application&apos;s settings file.
+          Installation paths live in <span className="mono">%APPDATA%\com.rtxspark.aicontrol.v2\settings.json</span>{" "}
+          and are chosen on the <b>Setup</b> page. The blackout engine keeps its own{" "}
+          <span className="mono">state.json</span> beside its script. Interface preferences above
+          live in this window&apos;s local storage; the automation values live in the application&apos;s
+          settings file.
         </div>
       </Card>
     </div>

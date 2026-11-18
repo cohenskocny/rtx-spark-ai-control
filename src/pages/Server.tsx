@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Snapshot } from "../lib/types";
 import { Card, Pill, Row, SectionHead } from "../components/primitives";
 import { age, num, uptime } from "../lib/format";
@@ -26,6 +27,9 @@ export function Server({
   const model = snap?.model;
   const busy = pending !== null;
   const progress = server?.progress_pct;
+  /** Which action is waiting for the operator to accept a battery launch. */
+  const [confirming, setConfirming] = useState<"start" | "restart" | null>(null);
+  const onBattery = snap?.power.online === false;
   const busyStage =
     server?.state === "starting" || server?.state === "loading" || server?.state === "stopping";
   const tail = (server?.log_tail ?? []).slice(-12);
@@ -108,7 +112,11 @@ export function Server({
                 type="button"
                 className="btn primary"
                 disabled={!server?.can_start || busy}
-                onClick={() => void run("start", actions.serverStart)}
+                onClick={() =>
+                  onBattery
+                    ? setConfirming("start")
+                    : void run("start", () => actions.serverStart())
+                }
               >
                 {pending === "start" ? "Starting…" : "Start"}
               </button>
@@ -130,7 +138,11 @@ export function Server({
                 type="button"
                 className="btn"
                 disabled={!server?.can_restart || busy}
-                onClick={() => void run("restart", actions.serverRestart)}
+                onClick={() =>
+                  onBattery
+                    ? setConfirming("restart")
+                    : void run("restart", () => actions.serverRestart())
+                }
               >
                 {pending === "restart" ? "Restarting…" : "Restart"}
               </button>
@@ -153,6 +165,52 @@ export function Server({
             from then on. Restart waits for the supervised child to exit before launching again,
             and a failed launch leaves the error in the log rather than a half-started server.
           </div>
+          {confirming ? (
+            <div className="confirm" role="alertdialog" aria-label="Battery launch">
+              <div className="text">
+                <span className="name">
+                  {confirming === "start" ? "Start on battery?" : "Restart on battery?"}
+                </span>
+                <span className="help">
+                  On battery this machine cannot hold a loaded model for long, and the server is
+                  being asked to load weights on purpose. Nothing starts until you confirm.
+                  {snap?.power.percent !== null && snap?.power.percent !== undefined
+                    ? ` Battery is at ${snap.power.percent}%.`
+                    : ""}
+                </span>
+              </div>
+              <div className="hero-actions">
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => {
+                    const action = confirming;
+                    setConfirming(null);
+                    void run(
+                      action,
+                      action === "start"
+                        ? () => actions.serverStart(true)
+                        : () => actions.serverRestart(true),
+                    );
+                  }}
+                >
+                  Launch anyway
+                </button>
+                <button type="button" className="btn ghost" onClick={() => setConfirming(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {onBattery ? (
+            <div className="note" style={{ marginTop: 12 }} title={snap?.power.detail}>
+              <Pill tone="loading" small>
+                on battery
+              </Pill>{" "}
+              Automatic startup and Follow Server recovery stay disabled while unplugged; a
+              server already running is only reported, never stopped.
+            </div>
+          ) : null}
         </Card>
 
         <Card className="pad-lg">
@@ -176,7 +234,7 @@ export function Server({
       </div>
 
       <Card className="pad-lg">
-        <SectionHead title="Configuration in use" hint="paths read from V1, never written" />
+        <SectionHead title="Configuration in use" hint="from the Setup page, never written here" />
         <div className="rows">
           <Row k="Model" v={model?.served_name ?? "—"} mono />
           <Row k="Checkpoint" v={model?.checkpoint ?? "—"} mono title={model?.checkpoint} />
